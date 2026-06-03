@@ -45,3 +45,6 @@ backend/evals/results/
 # Azure / local artifacts
 .azure/
 *.zip
+
+# Local Azure notes
+.azure-local-notes.txt
