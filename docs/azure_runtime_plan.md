@@ -238,3 +238,38 @@ Next planned infrastructure step:
 Create Azure Container Apps environment for backend and frontend hosting.
 ```
 
+
+---
+
+## Backend Container App
+
+The FastAPI backend skeleton is deployed to Azure Container Apps.
+
+```text
+Container App:
+ca-sandevistan-backend
+````
+
+```text
+Backend URL:
+https://ca-sandevistan-backend.graymushroom-28ea90b0.swedencentral.azurecontainerapps.io
+```
+
+```text
+Container image:
+acrsandevistan5606.azurecr.io/sandevistan-backend:phase1
+```
+
+Current health endpoint:
+
+```text
+/health
+```
+
+Current deployment state:
+
+```text
+Azure-hosted backend skeleton is live.
+Azure AI Search and Azure OpenAI runtime configuration are not yet wired.
+```
+
