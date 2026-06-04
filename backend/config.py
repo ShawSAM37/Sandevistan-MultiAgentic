@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     azure_search_admin_key: str | None = None
     azure_search_index_name: str = "rotary-instruction-manuals"
     azure_search_semantic_config: str = "rotary-instruction-manuals-semantic-config"
+    azure_search_api_version: str = "2024-07-01"
 
     azure_openai_endpoint: str | None = None
     azure_openai_api_key: str | None = None
@@ -43,3 +44,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
