@@ -48,3 +48,8 @@ backend/evals/results/
 
 # Local Azure notes
 .azure-local-notes.txt
+
+# Local data files
+data/raw/
+data/processed/
+*.csv
