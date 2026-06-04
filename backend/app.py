@@ -2,7 +2,8 @@
 
 from backend.config import settings
 from backend.constants import APPROVED_INDEX_FIELDS, AZURE_SEARCH_INDEX_NAME
-from backend.models import DebugRetrievalRequest
+from backend.context.context_builder import build_context_from_documents
+from backend.models import DebugContextRequest, DebugRetrievalRequest
 from backend.observability.logger import log_event
 from backend.observability.request_context import new_request_id
 from backend.observability.timing import elapsed_timer
@@ -90,3 +91,71 @@ async def debug_retrieval(request: DebugRetrievalRequest):
     )
 
     return result
+
+
+@app.post("/debug/context")
+async def debug_context(request: DebugContextRequest):
+    request_id = new_request_id()
+
+    log_event(
+        event="debug_context_request_received",
+        request_id=request_id,
+        query=request.query,
+        searchMode=request.searchMode,
+        filters=request.filters,
+        top=request.top,
+        k=request.k,
+        vectorFields=request.vectorFields,
+    )
+
+    with elapsed_timer() as timer:
+        retrieval_result = execute_search(
+            query=request.query,
+            search_mode=request.searchMode,
+            vector_fields=request.vectorFields,
+            filters=request.filters,
+            top=request.top,
+            k=request.k,
+            use_semantic_ranker=request.useSemanticRanker,
+            request_id=request_id,
+        )
+
+        context_result = build_context_from_documents(
+            documents=retrieval_result["documents"],
+            max_context_chars=request.maxContextChars,
+            max_chars_per_document=request.maxCharsPerDocument,
+            request_id=request_id,
+        )
+
+    response = {
+        "requestId": request_id,
+        "query": request.query,
+        "searchMode": request.searchMode,
+        "filters": request.filters,
+        "retrieval": {
+            "resultCount": retrieval_result["resultCount"],
+            "count": retrieval_result["count"],
+            "latencyMs": retrieval_result["latencyMs"],
+            "documents": retrieval_result["documents"],
+        },
+        "context": context_result["context"],
+        "contextCharCount": context_result["contextCharCount"],
+        "usedDocumentCount": context_result["usedDocumentCount"],
+        "skippedDocumentCount": context_result["skippedDocumentCount"],
+        "citations": context_result["citations"],
+        "usedDocuments": context_result["usedDocuments"],
+        "skippedDocuments": context_result["skippedDocuments"],
+        "endpointLatencyMs": timer["elapsedMs"],
+    }
+
+    log_event(
+        event="debug_context_request_completed",
+        request_id=request_id,
+        retrievalResultCount=retrieval_result["resultCount"],
+        contextCharCount=context_result["contextCharCount"],
+        usedDocumentCount=context_result["usedDocumentCount"],
+        skippedDocumentCount=context_result["skippedDocumentCount"],
+        endpointLatencyMs=timer["elapsedMs"],
+    )
+
+    return response
