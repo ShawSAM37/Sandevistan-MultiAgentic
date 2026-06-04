@@ -2,6 +2,7 @@
 
 from backend.config import settings
 from backend.constants import APPROVED_INDEX_FIELDS, AZURE_SEARCH_INDEX_NAME
+from backend.services.health_service import run_deep_health_check
 
 
 app = FastAPI(
@@ -10,7 +11,7 @@ app = FastAPI(
 )
 
 
-@app.get('/')
+@app.get("/")
 async def root():
     return {
         "service": settings.app_name,
@@ -32,3 +33,8 @@ async def health():
         "azureSearchConfigured": bool(settings.azure_search_endpoint),
         "azureOpenAIConfigured": bool(settings.azure_openai_endpoint),
     }
+
+
+@app.get("/health/deep")
+async def health_deep():
+    return run_deep_health_check()

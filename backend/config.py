@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     azure_search_endpoint: str | None = None
+    azure_search_admin_key: str | None = None
     azure_search_index_name: str = "rotary-instruction-manuals"
     azure_search_semantic_config: str = "rotary-instruction-manuals-semantic-config"
 
