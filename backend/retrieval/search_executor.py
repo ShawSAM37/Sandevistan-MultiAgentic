@@ -2,6 +2,8 @@
 
 from backend.config import settings
 from backend.constants import RETRIEVABLE_FIELDS, VECTOR_FIELDS
+from backend.observability.logger import log_event
+from backend.observability.timing import elapsed_timer
 from backend.retrieval.embedding_client import generate_query_embedding
 from backend.retrieval.filters import build_filter_expression
 
@@ -48,6 +50,7 @@ def execute_search(
     top: int = 10,
     k: int = 50,
     use_semantic_ranker: bool = False,
+    request_id: str | None = None,
 ) -> dict:
     if search_mode not in {"keyword", "vector", "hybrid"}:
         raise ValueError(f"Unsupported search mode: {search_mode}")
@@ -59,75 +62,99 @@ def execute_search(
         raise ValueError("AZURE_SEARCH_ADMIN_KEY is not configured.")
 
     vector_fields_used = validate_vector_fields(vector_fields or ["contentVector"])
+    filter_expression = build_filter_expression(filters)
 
-    url = (
-        f"{settings.azure_search_endpoint.rstrip('/')}"
-        f"/indexes/{settings.azure_search_index_name}/docs/search"
-        f"?api-version={settings.azure_search_api_version}"
+    log_event(
+        event="retrieval_started",
+        request_id=request_id,
+        query=query,
+        searchMode=search_mode,
+        vectorFields=vector_fields_used if search_mode in {"vector", "hybrid"} else [],
+        filters=filters or {},
+        filterExpression=filter_expression,
+        top=top,
+        k=k,
+        useSemanticRanker=use_semantic_ranker,
     )
 
-    headers = {
-        "Content-Type": "application/json",
-        "api-key": settings.azure_search_admin_key,
-    }
+    with elapsed_timer() as timer:
+        url = (
+            f"{settings.azure_search_endpoint.rstrip('/')}"
+            f"/indexes/{settings.azure_search_index_name}/docs/search"
+            f"?api-version={settings.azure_search_api_version}"
+        )
 
-    body: dict = {
-        "top": top,
-        "count": True,
-        "select": ",".join(RETRIEVABLE_FIELDS),
-    }
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": settings.azure_search_admin_key,
+        }
 
-    filter_expression = build_filter_expression(filters)
-    if filter_expression:
-        body["filter"] = filter_expression
+        body: dict = {
+            "top": top,
+            "count": True,
+            "select": ",".join(RETRIEVABLE_FIELDS),
+        }
 
-    if search_mode in {"keyword", "hybrid"}:
-        body["search"] = query
+        if filter_expression:
+            body["filter"] = filter_expression
 
-    if search_mode in {"vector", "hybrid"}:
-        embedding = generate_query_embedding(query)
+        if search_mode in {"keyword", "hybrid"}:
+            body["search"] = query
 
-        body["vectorQueries"] = [
-            {
-                "kind": "vector",
-                "vector": embedding,
-                "fields": vector_field,
-                "k": k,
-            }
-            for vector_field in vector_fields_used
+        if search_mode in {"vector", "hybrid"}:
+            embedding = generate_query_embedding(query)
+
+            body["vectorQueries"] = [
+                {
+                    "kind": "vector",
+                    "vector": embedding,
+                    "fields": vector_field,
+                    "k": k,
+                }
+                for vector_field in vector_fields_used
+            ]
+
+        if use_semantic_ranker and search_mode in {"keyword", "hybrid"}:
+            body["queryType"] = "semantic"
+            body["semanticConfiguration"] = settings.azure_search_semantic_config
+
+        response = requests.post(
+            url,
+            headers=headers,
+            json=body,
+            timeout=settings.request_timeout_seconds,
+        )
+
+        if response.status_code >= 400:
+            log_event(
+                event="retrieval_failed",
+                level="ERROR",
+                request_id=request_id,
+                statusCode=response.status_code,
+                responsePreview=response.text[:1000],
+                elapsedMs=timer["elapsedMs"],
+            )
+
+            raise RuntimeError(
+                "Azure AI Search query failed. "
+                f"Status={response.status_code}. "
+                f"Body={response.text[:2000]}"
+            )
+
+        payload = response.json()
+        raw_results = payload.get("value", [])
+
+        documents = [
+            normalize_search_result(
+                raw=result,
+                search_mode=search_mode,
+                vector_fields_used=vector_fields_used if search_mode in {"vector", "hybrid"} else [],
+            )
+            for result in raw_results
         ]
 
-    if use_semantic_ranker and search_mode in {"keyword", "hybrid"}:
-        body["queryType"] = "semantic"
-        body["semanticConfiguration"] = settings.azure_search_semantic_config
-
-    response = requests.post(
-        url,
-        headers=headers,
-        json=body,
-        timeout=settings.request_timeout_seconds,
-    )
-
-    if response.status_code >= 400:
-        raise RuntimeError(
-            "Azure AI Search query failed. "
-            f"Status={response.status_code}. "
-            f"Body={response.text[:2000]}"
-        )
-
-    payload = response.json()
-    raw_results = payload.get("value", [])
-
-    documents = [
-        normalize_search_result(
-            raw=result,
-            search_mode=search_mode,
-            vector_fields_used=vector_fields_used if search_mode in {"vector", "hybrid"} else [],
-        )
-        for result in raw_results
-    ]
-
-    return {
+    result = {
+        "requestId": request_id,
         "query": query,
         "searchMode": search_mode,
         "vectorFields": vector_fields_used if search_mode in {"vector", "hybrid"} else [],
@@ -138,5 +165,18 @@ def execute_search(
         "useSemanticRanker": use_semantic_ranker,
         "count": payload.get("@odata.count"),
         "resultCount": len(documents),
+        "latencyMs": timer["elapsedMs"],
         "documents": documents,
     }
+
+    log_event(
+        event="retrieval_completed",
+        request_id=request_id,
+        query=query,
+        searchMode=search_mode,
+        resultCount=len(documents),
+        count=payload.get("@odata.count"),
+        latencyMs=timer["elapsedMs"],
+    )
+
+    return result
