@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     critic_max_completion_tokens: int = 400
     revision_max_completion_tokens: int = 600
 
+    openai_chat_min_interval_seconds: float = 8.0
+    openai_chat_retry_count: int = 2
+    openai_chat_retry_base_seconds: float = 5.0
+    openai_chat_retry_jitter_seconds: float = 2.0
+
     conversation_summary_max_chars: int = 2000
     max_recent_turns: int = 4
 
@@ -60,6 +65,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
 
 
 
