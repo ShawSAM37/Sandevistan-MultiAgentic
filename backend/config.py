@@ -21,12 +21,20 @@ class Settings(BaseSettings):
     vector_dimensions: int = 1024
 
     default_top_k: int = 10
-    max_context_chars: int = 50000
-    max_chars_per_document: int = 10000
+    max_context_chars: int = 12000
+    max_chars_per_document: int = 2500
     max_revision_count: int = 1
     max_search_plans: int = 3
     max_llm_calls_per_request: int = 6
     request_timeout_seconds: int = 60
+
+    answer_max_completion_tokens: int = 600
+    guardrail_max_completion_tokens: int = 200
+    critic_max_completion_tokens: int = 400
+    revision_max_completion_tokens: int = 600
+
+    conversation_summary_max_chars: int = 2000
+    max_recent_turns: int = 4
 
     enable_title_vector_search: bool = True
     enable_semantic_ranker: bool = True
@@ -44,4 +52,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
 
