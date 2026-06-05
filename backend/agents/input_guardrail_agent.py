@@ -2,6 +2,7 @@
 import re
 from typing import Any
 
+from backend.agents.model_router import ModelRole, get_deployment_for_role
 from backend.config import settings
 from backend.models import InputGuardrailResult
 from backend.observability.logger import log_event
@@ -143,14 +144,13 @@ def run_input_guardrail_agent(
         )
         return deterministic_result
 
-    if not settings.azure_openai_chat_deployment:
-        raise ValueError("AZURE_OPENAI_CHAT_DEPLOYMENT is not configured.")
+    guardrail_deployment = get_deployment_for_role(ModelRole.GUARDRAIL)
 
     log_event(
         event="input_guardrail_started",
         request_id=request_id,
         question=question,
-        deployment=settings.azure_openai_chat_deployment,
+        deployment=guardrail_deployment,
         maxCompletionTokens=settings.guardrail_max_completion_tokens,
     )
 
@@ -163,7 +163,7 @@ def run_input_guardrail_agent(
 
         try:
             response = client.chat.completions.create(
-                model=settings.azure_openai_chat_deployment,
+                model=guardrail_deployment,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},
@@ -173,7 +173,7 @@ def run_input_guardrail_agent(
             )
         except Exception:
             response = client.chat.completions.create(
-                model=settings.azure_openai_chat_deployment,
+                model=guardrail_deployment,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},
@@ -197,3 +197,4 @@ def run_input_guardrail_agent(
     )
 
     return result
+

@@ -4,6 +4,7 @@ from typing import Any
 
 from openai import APIError, APITimeoutError, BadRequestError, RateLimitError
 
+from backend.agents.model_router import ModelRole, get_deployment_for_role, has_fallback_answer_deployment
 from backend.config import settings
 from backend.models import AnswerGenerationResult
 from backend.observability.logger import log_event
@@ -90,8 +91,7 @@ def generate_answer_from_context(
             answerFound=False,
         )
 
-    if not settings.azure_openai_chat_deployment:
-        raise ValueError("AZURE_OPENAI_CHAT_DEPLOYMENT is not configured.")
+    answer_deployment = get_deployment_for_role(ModelRole.ANSWER)
 
     log_event(
         event="answer_generation_started",
@@ -99,7 +99,7 @@ def generate_answer_from_context(
         question=question,
         contextCharCount=len(context),
         citationCount=len(citations),
-        deployment=settings.azure_openai_chat_deployment,
+        deployment=answer_deployment,
         maxCompletionTokens=settings.answer_max_completion_tokens,
     )
 
@@ -115,7 +115,7 @@ def generate_answer_from_context(
         try:
             try:
                 response = client.chat.completions.create(
-                    model=settings.azure_openai_chat_deployment,
+                    model=answer_deployment,
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": user_prompt},
@@ -125,7 +125,7 @@ def generate_answer_from_context(
                 )
             except BadRequestError:
                 response = client.chat.completions.create(
-                    model=settings.azure_openai_chat_deployment,
+                    model=answer_deployment,
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": user_prompt},
@@ -178,4 +178,5 @@ def generate_answer_from_context(
                 latencyMs=timer["elapsedMs"],
             )
             return model_error_fallback(str(exc))
+
 

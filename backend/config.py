@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     azure_openai_api_key: str | None = None
     azure_openai_embedding_deployment: str | None = None
     azure_openai_chat_deployment: str | None = None
+
+    azure_openai_answer_deployment: str | None = None
+    azure_openai_guardrail_deployment: str | None = None
+    azure_openai_planner_deployment: str | None = None
+    azure_openai_critic_deployment: str | None = None
+    azure_openai_summarizer_deployment: str | None = None
+    azure_openai_fallback_chat_deployment: str | None = None
+
     azure_openai_api_version: str = "2024-02-01"
 
     vector_dimensions: int = 1024
@@ -52,5 +60,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
 
 
