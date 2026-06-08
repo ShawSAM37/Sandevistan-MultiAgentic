@@ -3,6 +3,7 @@
 from backend.agents.answer_generation_agent import generate_answer_from_context
 from backend.agents.grounding_critic_agent import evaluate_grounding
 from backend.agents.input_guardrail_agent import run_input_guardrail_agent
+from backend.agents.revision_agent import revise_answer
 from backend.config import settings
 from backend.constants import APPROVED_INDEX_FIELDS, AZURE_SEARCH_INDEX_NAME
 from backend.context.context_builder import build_context_from_documents
@@ -12,6 +13,7 @@ from backend.models import (
     DebugGroundingRequest,
     DebugGuardrailRequest,
     DebugRetrievalRequest,
+    DebugRevisionRequest,
 )
 from backend.observability.logger import log_event
 from backend.observability.request_context import new_request_id
@@ -270,6 +272,46 @@ async def debug_answer(request: DebugAnswerRequest):
         else:
             grounding_result = None
 
+        revision_result = None
+        revision_attempted = False
+        revision_count = 0
+        final_answer = answer_result.answer
+        final_used_citation_paths = answer_result.usedCitationPaths
+        final_confidence = answer_result.confidence
+
+        if (
+            answer_result.answerFound
+            and grounding_result is not None
+            and grounding_result.requiresRevision
+            and settings.max_revision_count > 0
+        ):
+            revision_attempted = True
+            revision_count = 1
+
+            revision_result = revise_answer(
+                question=guardrail_result.sanitizedQuestion or request.query,
+                answer=answer_result.answer,
+                grounding_result=grounding_result,
+                context=context_result["context"],
+                citations=context_result["citations"],
+                request_id=request_id,
+            )
+
+            if revision_result.revisionApplied:
+                final_answer = revision_result.revisedAnswer
+                final_used_citation_paths = revision_result.usedCitationPaths
+                final_confidence = revision_result.confidence
+
+        elif answer_result.answerFound and grounding_result is not None:
+            log_event(
+                event="revision_skipped",
+                request_id=request_id,
+                reason="Grounding critic did not require revision or revision budget is zero.",
+                grounded=grounding_result.grounded,
+                requiresRevision=grounding_result.requiresRevision,
+                maxRevisionCount=settings.max_revision_count,
+            )
+
     response = {
         "requestId": request_id,
         "query": request.query,
@@ -282,6 +324,12 @@ async def debug_answer(request: DebugAnswerRequest):
         "citations": context_result["citations"],
         "usedDocuments": context_result["usedDocuments"],
         "grounding": grounding_result.model_dump() if grounding_result else None,
+        "revision": revision_result.model_dump() if revision_result else None,
+        "revisionAttempted": revision_attempted,
+        "revisionCount": revision_count,
+        "finalAnswer": final_answer,
+        "finalUsedCitationPaths": final_used_citation_paths,
+        "finalConfidence": final_confidence,
         "retrieval": {
             "resultCount": retrieval_result["resultCount"],
             "count": retrieval_result["count"],
@@ -306,6 +354,9 @@ async def debug_answer(request: DebugAnswerRequest):
         confidence=answer_result.confidence,
         grounded=grounding_result.grounded if grounding_result else None,
         requiresRevision=grounding_result.requiresRevision if grounding_result else None,
+        revisionAttempted=revision_attempted,
+        revisionCount=revision_count,
+        revisionApplied=revision_result.revisionApplied if revision_result else None,
         retrievalResultCount=retrieval_result["resultCount"],
         usedDocumentCount=context_result["usedDocumentCount"],
         endpointLatencyMs=timer["elapsedMs"],
@@ -442,3 +493,187 @@ async def debug_grounding(request: DebugGroundingRequest):
 
     return response
 
+
+
+
+@app.post("/debug/revision")
+async def debug_revision(request: DebugRevisionRequest):
+    request_id = new_request_id()
+
+    log_event(
+        event="debug_revision_request_received",
+        request_id=request_id,
+        query=request.query,
+        searchMode=request.searchMode,
+        filters=request.filters,
+        top=request.top,
+        k=request.k,
+        vectorFields=request.vectorFields,
+    )
+
+    with elapsed_timer() as timer:
+        guardrail_result = run_input_guardrail_agent(
+            question=request.query,
+            request_id=request_id,
+        )
+
+        if not guardrail_result.allowed:
+            response = {
+                "requestId": request_id,
+                "query": request.query,
+                "sanitizedQuestion": guardrail_result.sanitizedQuestion,
+                "guardrail": guardrail_result.model_dump(),
+                "answer": "I cannot help with that request. Please ask a safe, manual-related question about Sandvik rotary equipment.",
+                "answerFound": False,
+                "confidence": 0.0,
+                "usedCitationPaths": [],
+                "citations": [],
+                "usedDocuments": [],
+                "grounding": None,
+                "revision": None,
+                "revisionAttempted": False,
+                "revisionCount": 0,
+                "finalAnswer": "I cannot help with that request. Please ask a safe, manual-related question about Sandvik rotary equipment.",
+                "retrieval": None,
+                "contextCharCount": 0,
+                "usedDocumentCount": 0,
+                "skippedDocumentCount": 0,
+                "endpointLatencyMs": timer["elapsedMs"],
+            }
+
+            log_event(
+                event="debug_revision_blocked_by_guardrail",
+                request_id=request_id,
+                riskLevel=guardrail_result.riskLevel,
+                reason=guardrail_result.reason,
+                endpointLatencyMs=timer["elapsedMs"],
+            )
+
+            return response
+
+        retrieval_result = execute_search(
+            query=guardrail_result.sanitizedQuestion or request.query,
+            search_mode=request.searchMode,
+            vector_fields=request.vectorFields,
+            filters=request.filters,
+            top=request.top,
+            k=request.k,
+            use_semantic_ranker=request.useSemanticRanker,
+            request_id=request_id,
+        )
+
+        context_result = build_context_from_documents(
+            documents=retrieval_result["documents"],
+            max_context_chars=request.maxContextChars,
+            max_chars_per_document=request.maxCharsPerDocument,
+            request_id=request_id,
+        )
+
+        answer_result = generate_answer_from_context(
+            question=guardrail_result.sanitizedQuestion or request.query,
+            context=context_result["context"],
+            citations=context_result["citations"],
+            request_id=request_id,
+        )
+
+        if answer_result.answerFound:
+            grounding_result = evaluate_grounding(
+                question=guardrail_result.sanitizedQuestion or request.query,
+                answer=answer_result.answer,
+                context=context_result["context"],
+                citations=context_result["citations"],
+                request_id=request_id,
+            )
+        else:
+            grounding_result = None
+
+        revision_result = None
+        revision_attempted = False
+        revision_count = 0
+        final_answer = answer_result.answer
+        final_used_citation_paths = answer_result.usedCitationPaths
+        final_confidence = answer_result.confidence
+
+        if (
+            answer_result.answerFound
+            and grounding_result is not None
+            and grounding_result.requiresRevision
+            and settings.max_revision_count > 0
+        ):
+            revision_attempted = True
+            revision_count = 1
+
+            revision_result = revise_answer(
+                question=guardrail_result.sanitizedQuestion or request.query,
+                answer=answer_result.answer,
+                grounding_result=grounding_result,
+                context=context_result["context"],
+                citations=context_result["citations"],
+                request_id=request_id,
+            )
+
+            if revision_result.revisionApplied:
+                final_answer = revision_result.revisedAnswer
+                final_used_citation_paths = revision_result.usedCitationPaths
+                final_confidence = revision_result.confidence
+
+        elif answer_result.answerFound and grounding_result is not None:
+            log_event(
+                event="revision_skipped",
+                request_id=request_id,
+                reason="Grounding critic did not require revision or revision budget is zero.",
+                grounded=grounding_result.grounded,
+                requiresRevision=grounding_result.requiresRevision,
+                maxRevisionCount=settings.max_revision_count,
+            )
+
+    response = {
+        "requestId": request_id,
+        "query": request.query,
+        "sanitizedQuestion": guardrail_result.sanitizedQuestion,
+        "guardrail": guardrail_result.model_dump(),
+        "answer": answer_result.answer,
+        "answerFound": answer_result.answerFound,
+        "confidence": answer_result.confidence,
+        "usedCitationPaths": answer_result.usedCitationPaths,
+        "citations": context_result["citations"],
+        "usedDocuments": context_result["usedDocuments"],
+        "grounding": grounding_result.model_dump() if grounding_result else None,
+        "revision": revision_result.model_dump() if revision_result else None,
+        "revisionAttempted": revision_attempted,
+        "revisionCount": revision_count,
+        "finalAnswer": final_answer,
+        "finalUsedCitationPaths": final_used_citation_paths,
+        "finalConfidence": final_confidence,
+        "retrieval": {
+            "resultCount": retrieval_result["resultCount"],
+            "count": retrieval_result["count"],
+            "latencyMs": retrieval_result["latencyMs"],
+            "searchMode": request.searchMode,
+            "vectorFields": request.vectorFields,
+            "filters": request.filters,
+        },
+        "contextCharCount": context_result["contextCharCount"],
+        "usedDocumentCount": context_result["usedDocumentCount"],
+        "skippedDocumentCount": context_result["skippedDocumentCount"],
+        "endpointLatencyMs": timer["elapsedMs"],
+    }
+
+    if request.includeDebugContext:
+        response["context"] = context_result["context"]
+
+    log_event(
+        event="debug_revision_request_completed",
+        request_id=request_id,
+        answerFound=answer_result.answerFound,
+        grounded=grounding_result.grounded if grounding_result else None,
+        requiresRevision=grounding_result.requiresRevision if grounding_result else None,
+        revisionAttempted=revision_attempted,
+        revisionCount=revision_count,
+        revisionApplied=revision_result.revisionApplied if revision_result else None,
+        retrievalResultCount=retrieval_result["resultCount"],
+        usedDocumentCount=context_result["usedDocumentCount"],
+        endpointLatencyMs=timer["elapsedMs"],
+    )
+
+    return response
