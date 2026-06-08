@@ -36,10 +36,10 @@ class Settings(BaseSettings):
     max_llm_calls_per_request: int = 6
     request_timeout_seconds: int = 60
 
-    answer_max_completion_tokens: int = 600
+    answer_max_completion_tokens: int = 800
     guardrail_max_completion_tokens: int = 200
-    critic_max_completion_tokens: int = 400
-    revision_max_completion_tokens: int = 600
+    critic_max_completion_tokens: int = 1000
+    revision_max_completion_tokens: int = 1000
 
     openai_chat_min_interval_seconds: float = 8.0
     openai_chat_retry_count: int = 2
@@ -65,6 +65,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
 
 
 
