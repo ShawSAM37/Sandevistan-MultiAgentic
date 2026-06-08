@@ -12,6 +12,7 @@ from backend.models import (
     DebugAnswerRequest,
     DebugContextRequest,
     DebugGroundingRequest,
+    DebugGraphAnswerRequest,
     DebugGuardrailRequest,
     DebugRetrievalRequest,
     DebugRevisionRequest,
@@ -21,6 +22,7 @@ from backend.observability.logger import log_event
 from backend.observability.request_context import new_request_id
 from backend.observability.timing import elapsed_timer
 from backend.retrieval.search_executor import execute_search
+from backend.graph.workflow import graph_state_to_debug_response, run_rag_graph
 from backend.services.health_service import run_deep_health_check
 
 
@@ -890,6 +892,67 @@ async def debug_safety(request: DebugSafetyRequest):
         safetyRequiresRevision=safety_result.requiresRevision if safety_result else None,
         retrievalResultCount=retrieval_result["resultCount"],
         usedDocumentCount=context_result["usedDocumentCount"],
+        endpointLatencyMs=timer["elapsedMs"],
+    )
+
+    return response
+
+
+
+@app.post("/debug/graph-answer")
+async def debug_graph_answer(request: DebugGraphAnswerRequest):
+    request_id = new_request_id()
+
+    log_event(
+        event="debug_graph_answer_request_received",
+        request_id=request_id,
+        threadId=request.threadId,
+        query=request.query,
+        searchMode=request.searchMode,
+        filters=request.filters,
+        top=request.top,
+        k=request.k,
+        vectorFields=request.vectorFields,
+        useSemanticRanker=request.useSemanticRanker,
+    )
+
+    with elapsed_timer() as timer:
+        graph_state = run_rag_graph(
+            request_id=request_id,
+            question=request.query,
+            thread_id=request.threadId,
+            user_id=request.userId,
+            search_mode=request.searchMode,
+            vector_fields=request.vectorFields,
+            filters=request.filters,
+            top=request.top,
+            k=request.k,
+            use_semantic_ranker=request.useSemanticRanker,
+            include_debug_context=request.includeDebugContext,
+            max_context_chars=request.maxContextChars or settings.max_context_chars,
+            max_chars_per_document=request.maxCharsPerDocument or settings.max_chars_per_document,
+            answer_max_completion_tokens=settings.answer_max_completion_tokens,
+            critic_max_completion_tokens=settings.critic_max_completion_tokens,
+            revision_max_completion_tokens=settings.revision_max_completion_tokens,
+            max_llm_calls=settings.max_llm_calls_per_request,
+            max_revision_count=settings.max_revision_count,
+            max_recent_turns=settings.max_recent_turns,
+            conversation_summary_max_chars=settings.conversation_summary_max_chars,
+        )
+
+    response = graph_state_to_debug_response(graph_state)
+    response["endpointLatencyMs"] = timer["elapsedMs"]
+
+    log_event(
+        event="debug_graph_answer_request_completed",
+        request_id=request_id,
+        threadId=graph_state.get("thread_id"),
+        answerFound=graph_state.get("answer_found"),
+        finalConfidence=graph_state.get("final_confidence"),
+        llmCallsUsed=graph_state.get("budgets", {}).get("llmCallsUsed"),
+        revisionCount=graph_state.get("budgets", {}).get("revisionCount"),
+        traceStepCount=len(graph_state.get("trace_steps", [])),
+        errorCount=len(graph_state.get("errors", [])),
         endpointLatencyMs=timer["elapsedMs"],
     )
 

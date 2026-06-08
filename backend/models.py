@@ -371,3 +371,33 @@ class DebugSafetyRequest(BaseModel):
         if invalid_fields:
             raise ValueError(f"Unsupported filter fields for V1: {sorted(invalid_fields)}")
         return self
+
+class DebugGraphAnswerRequest(BaseModel):
+    query: str = Field(min_length=1)
+
+    threadId: str | None = None
+    userId: str | None = None
+
+    searchMode: Literal["keyword", "vector", "hybrid"] = "hybrid"
+    vectorFields: list[Literal["contentVector", "titleVector"]] = Field(
+        default_factory=lambda: ["contentVector"]
+    )
+
+    filters: dict[str, str] = Field(default_factory=dict)
+
+    top: int = Field(default=3, ge=1, le=20)
+    k: int = Field(default=50, ge=1, le=100)
+
+    useSemanticRanker: bool = False
+
+    maxContextChars: int | None = None
+    maxCharsPerDocument: int | None = None
+
+    includeDebugContext: bool = False
+
+    @model_validator(mode="after")
+    def validate_debug_graph_answer_filters(self):
+        invalid_fields = set(self.filters.keys()) - set(USER_FILTER_FIELDS)
+        if invalid_fields:
+            raise ValueError(f"Unsupported filter fields for V1: {sorted(invalid_fields)}")
+        return self
