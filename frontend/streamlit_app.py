@@ -19,19 +19,38 @@ DEFAULT_BACKEND_URL = os.getenv(
     "https://ca-sandevistan-backend.graymushroom-28ea90b0.swedencentral.azurecontainerapps.io",
 )
 
+SAFE_REFUSAL_TEXT = (
+    "I cannot help with that request. Please ask a safe, manual-related question "
+    "about Sandvik rotary equipment."
+)
+
 
 def normalize_backend_url(value: str) -> str:
     return value.strip().rstrip("/")
 
 
+def disable_insecure_warnings_if_needed(verify_ssl: bool) -> None:
+    if not verify_ssl and urllib3 is not None:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
 def post_ask(
     *,
     backend_url: str,
-    payload: dict[str, Any],
+    question: str,
+    thread_id: str,
     timeout_seconds: int,
     verify_ssl: bool,
 ) -> dict[str, Any]:
     url = normalize_backend_url(backend_url) + "/ask"
+
+    payload = {
+        "question": question,
+        "threadId": thread_id,
+        "searchMode": "hybrid",
+        "vectorFields": ["contentVector"],
+        "useSemanticRanker": False,
+    }
 
     response = requests.post(
         url,
@@ -55,261 +74,207 @@ def post_ask(
     return body
 
 
-def render_citations(citations: list[dict[str, Any]], used_paths: list[str]) -> None:
-    if not citations:
-        st.info("No citations returned.")
-        return
-
-    used_path_set = set(used_paths or [])
-
-    for citation in citations:
-        citation_id = citation.get("citationId")
-        title = citation.get("title") or "Untitled"
-        path = citation.get("citationPath") or ""
-        machine = citation.get("machine") or "Unknown machine"
-        manual_type = citation.get("manualType") or "Unknown manual type"
-        base_machine = citation.get("baseMachine") or "Unknown base machine"
-        serial_number = citation.get("serialNumber") or "Unknown serial"
-
-        used_badge = "✅ Used" if path in used_path_set else "Referenced"
-
-        with st.expander(f"[{citation_id}] {title} — {used_badge}"):
-            st.write(f"**Machine:** {machine}")
-            st.write(f"**Base machine:** {base_machine}")
-            st.write(f"**Serial number:** {serial_number}")
-            st.write(f"**Manual type:** {manual_type}")
-            st.code(path, language="text")
-
-
-def render_response(result: dict[str, Any]) -> None:
-    answer = result.get("answer") or ""
-    answer_found = bool(result.get("answerFound", False))
-    confidence = float(result.get("confidence", 0.0) or 0.0)
-    safety = result.get("safety")
-    latency_ms = result.get("latencyMs")
-    request_id = result.get("requestId")
-    thread_id = result.get("threadId")
-
-    st.subheader("Answer")
-
-    if answer_found:
-        st.success("Answer found")
-    else:
-        st.warning("No grounded answer found / request blocked")
-
-    st.markdown(answer)
-
-    st.divider()
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("Confidence", f"{confidence:.2f}")
-
-    with col2:
-        st.metric("Latency", f"{latency_ms} ms" if latency_ms is not None else "N/A")
-
-    with col3:
-        if safety is None:
-            st.metric("Safety", "N/A")
-        elif safety.get("safe") is True and safety.get("requiresRevision") is False:
-            st.metric("Safety", "Safe")
-        else:
-            st.metric("Safety", "Review")
-
-    with st.expander("Request metadata"):
-        st.write(f"**Request ID:** `{request_id}`")
-        st.write(f"**Thread ID:** `{thread_id}`")
-        st.json(
-            {
-                "answerFound": answer_found,
-                "confidence": confidence,
-                "safety": safety,
-                "latencyMs": latency_ms,
-                "usedCitationPaths": result.get("usedCitationPaths", []),
-            }
-        )
-
-    st.subheader("Citations")
-    render_citations(
-        citations=result.get("citations", []) or [],
-        used_paths=result.get("usedCitationPaths", []) or [],
-    )
-
-
-def init_session_state() -> None:
+def ensure_state() -> None:
     if "thread_id" not in st.session_state:
         st.session_state.thread_id = f"streamlit-thread-{uuid.uuid4()}"
 
-    if "last_result" not in st.session_state:
-        st.session_state.last_result = None
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-    if "last_payload" not in st.session_state:
-        st.session_state.last_payload = None
+    if "last_error" not in st.session_state:
+        st.session_state.last_error = None
+
+
+def new_chat() -> None:
+    st.session_state.thread_id = f"streamlit-thread-{uuid.uuid4()}"
+    st.session_state.messages = []
+    st.session_state.last_error = None
+
+
+def render_citation_card(citation: dict[str, Any], used_paths: set[str]) -> None:
+    citation_id = citation.get("citationId")
+    title = citation.get("title") or "Untitled"
+    path = citation.get("citationPath") or ""
+    machine = citation.get("machine") or "Unknown machine"
+    base_machine = citation.get("baseMachine") or "Unknown base machine"
+    serial_number = citation.get("serialNumber") or "Unknown serial"
+    manual_type = citation.get("manualType") or "Unknown manual type"
+
+    used_label = "Used in answer" if path in used_paths else "Retrieved"
+
+    with st.expander(f"[{citation_id}] {title} — {used_label}"):
+        st.markdown(f"**Machine:** {machine}")
+        st.markdown(f"**Base machine:** {base_machine}")
+        st.markdown(f"**Serial number:** {serial_number}")
+        st.markdown(f"**Manual type:** {manual_type}")
+        st.code(path, language="text")
+
+
+def render_assistant_response(message: dict[str, Any]) -> None:
+    result = message.get("result") or {}
+    answer = result.get("answer") or message.get("content") or ""
+    answer_found = bool(result.get("answerFound", False))
+    confidence = result.get("confidence")
+    safety = result.get("safety")
+    citations = result.get("citations") or []
+    used_paths = set(result.get("usedCitationPaths") or [])
+    latency_ms = result.get("latencyMs")
+    request_id = result.get("requestId")
+
+    with st.chat_message("assistant"):
+        if answer_found:
+            st.markdown(answer)
+        else:
+            st.warning(answer or SAFE_REFUSAL_TEXT)
+
+        metadata_cols = st.columns([1, 1, 1])
+
+        with metadata_cols[0]:
+            if confidence is not None:
+                st.caption(f"Confidence: {float(confidence):.2f}")
+
+        with metadata_cols[1]:
+            if safety is None:
+                st.caption("Safety: N/A")
+            elif safety.get("safe") is True and safety.get("requiresRevision") is False:
+                st.caption("Safety: Safe")
+            else:
+                st.caption("Safety: Review")
+
+        with metadata_cols[2]:
+            if latency_ms is not None:
+                st.caption(f"Latency: {latency_ms} ms")
+
+        if citations:
+            st.markdown("**Citations**")
+            for citation in citations:
+                render_citation_card(citation, used_paths)
+
+        with st.expander("Response details", expanded=False):
+            st.markdown(f"**Request ID:** `{request_id}`")
+            st.markdown(f"**Thread ID:** `{result.get('threadId')}`")
+            st.json(
+                {
+                    "answerFound": answer_found,
+                    "confidence": confidence,
+                    "safety": safety,
+                    "usedCitationPaths": list(used_paths),
+                    "latencyMs": latency_ms,
+                }
+            )
+
+
+def render_chat_history() -> None:
+    for message in st.session_state.messages:
+        role = message.get("role")
+
+        if role == "user":
+            with st.chat_message("user"):
+                st.markdown(message.get("content", ""))
+
+        elif role == "assistant":
+            render_assistant_response(message)
 
 
 def main() -> None:
     st.set_page_config(
-        page_title="Sandevistan RAG",
+        page_title="Sandevistan",
         page_icon="⚙️",
         layout="wide",
     )
 
-    init_session_state()
-
-    st.title("⚙️ Sandevistan Multi-Agentic RAG")
-    st.caption("Production `/ask` frontend for Sandvik rotary instruction manual questions.")
+    ensure_state()
 
     with st.sidebar:
-        st.header("Backend")
+        st.title("⚙️ Sandevistan")
 
-        backend_url = st.text_input(
-            "Backend URL",
-            value=DEFAULT_BACKEND_URL,
-            help="Base URL of the FastAPI backend. The app calls POST /ask.",
-        )
+        st.caption("Chat interface for Sandvik rotary instruction manuals.")
 
-        verify_ssl = st.checkbox(
-            "Verify TLS certificate",
-            value=os.getenv("STREAMLIT_ASK_INSECURE", "").lower() not in {"1", "true", "yes"},
-            help="Disable only if local/corporate Python certificate trust causes SSL errors.",
-        )
-
-        if not verify_ssl and urllib3 is not None:
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-        timeout_seconds = st.number_input(
-            "Timeout seconds",
-            min_value=10,
-            max_value=180,
-            value=90,
-            step=5,
-        )
-
-        st.divider()
-
-        st.header("Thread")
-
-        st.text_input(
-            "Thread ID",
-            key="thread_id",
-            help="Used for future conversation continuity. Currently passed through to backend graph state.",
-        )
-
-        if st.button("New thread"):
-            st.session_state.thread_id = f"streamlit-thread-{uuid.uuid4()}"
-            st.session_state.last_result = None
-            st.session_state.last_payload = None
+        if st.button("New chat", type="primary"):
+            new_chat()
             st.rerun()
 
         st.divider()
 
-        st.header("Retrieval")
+        with st.expander("Connection settings", expanded=False):
+            backend_url = st.text_input(
+                "Backend URL",
+                value=DEFAULT_BACKEND_URL,
+            )
 
-        search_mode = st.selectbox(
-            "Search mode",
-            options=["hybrid", "keyword", "vector"],
-            index=0,
-        )
+            verify_ssl = st.checkbox(
+                "Verify TLS certificate",
+                value=os.getenv("STREAMLIT_ASK_INSECURE", "").lower()
+                not in {"1", "true", "yes"},
+                help="Disable only if your local Python environment has corporate certificate issues.",
+            )
 
-        vector_field_options = ["contentVector", "titleVector"]
-        vector_fields = st.multiselect(
-            "Vector fields",
-            options=vector_field_options,
-            default=["contentVector"],
-        )
-
-        use_semantic_ranker = st.checkbox(
-            "Use semantic ranker",
-            value=False,
-        )
-
-        top = st.slider(
-            "Top documents",
-            min_value=1,
-            max_value=20,
-            value=3,
-        )
-
-        k = st.slider(
-            "Vector K",
-            min_value=1,
-            max_value=100,
-            value=50,
-        )
+            timeout_seconds = st.number_input(
+                "Timeout seconds",
+                min_value=10,
+                max_value=180,
+                value=90,
+                step=5,
+            )
 
         st.divider()
 
-        st.header("Optional filters")
+        st.caption("Thread")
+        st.code(st.session_state.thread_id, language="text")
 
-        machine = st.text_input("machine")
-        base_machine = st.text_input("baseMachine")
-        serial_number = st.text_input("serialNumber")
-        manual_type = st.text_input("manualType")
+        st.caption(
+            "Note: full multi-turn backend memory will arrive in the upcoming /chat endpoint. "
+            "This UI already preserves frontend chat history and passes a stable threadId."
+        )
 
-    question = st.text_area(
-        "Ask a manual-related question",
-        value="How do I replace the hydraulic filter?",
-        height=120,
-    )
+    disable_insecure_warnings_if_needed(verify_ssl)
 
-    col_ask, col_clear = st.columns([1, 1])
+    st.title("Sandevistan Manual Assistant")
+    st.caption("Ask one clear question about Sandvik rotary equipment manuals.")
 
-    with col_ask:
-        ask_clicked = st.button("Ask Sandevistan", type="primary")
+    render_chat_history()
 
-    with col_clear:
-        clear_clicked = st.button("Clear result")
+    if st.session_state.last_error:
+        st.error(st.session_state.last_error)
 
-    if clear_clicked:
-        st.session_state.last_result = None
-        st.session_state.last_payload = None
-        st.rerun()
+    question = st.chat_input("Ask about a machine, procedure, warning, or troubleshooting topic...")
 
-    if ask_clicked:
-        filters: dict[str, str] = {}
+    if question:
+        st.session_state.last_error = None
 
-        if machine.strip():
-            filters["machine"] = machine.strip()
-        if base_machine.strip():
-            filters["baseMachine"] = base_machine.strip()
-        if serial_number.strip():
-            filters["serialNumber"] = serial_number.strip()
-        if manual_type.strip():
-            filters["manualType"] = manual_type.strip()
+        st.session_state.messages.append(
+            {
+                "role": "user",
+                "content": question,
+            }
+        )
 
-        payload = {
-            "question": question,
-            "threadId": st.session_state.thread_id,
-            "searchMode": search_mode,
-            "vectorFields": vector_fields or ["contentVector"],
-            "filters": filters,
-            "top": top,
-            "k": k,
-            "useSemanticRanker": use_semantic_ranker,
-        }
+        with st.chat_message("user"):
+            st.markdown(question)
 
-        st.session_state.last_payload = payload
+        with st.chat_message("assistant"):
+            with st.spinner("Searching manuals and checking safety..."):
+                try:
+                    result = post_ask(
+                        backend_url=backend_url,
+                        question=question,
+                        thread_id=st.session_state.thread_id,
+                        timeout_seconds=int(timeout_seconds),
+                        verify_ssl=verify_ssl,
+                    )
 
-        with st.spinner("Asking Sandevistan..."):
-            try:
-                result = post_ask(
-                    backend_url=backend_url,
-                    payload=payload,
-                    timeout_seconds=int(timeout_seconds),
-                    verify_ssl=verify_ssl,
-                )
-                st.session_state.last_result = result
-            except Exception as exc:
-                st.session_state.last_result = None
-                st.error(str(exc))
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": result.get("answer", ""),
+                        "result": result,
+                    }
 
-    if st.session_state.last_payload is not None:
-        with st.expander("Last request payload"):
-            st.json(st.session_state.last_payload)
+                    st.session_state.messages.append(assistant_message)
+                    st.rerun()
 
-    if st.session_state.last_result is not None:
-        render_response(st.session_state.last_result)
+                except Exception as exc:
+                    st.session_state.last_error = str(exc)
+                    st.error(st.session_state.last_error)
 
 
 if __name__ == "__main__":
