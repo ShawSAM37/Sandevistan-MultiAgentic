@@ -443,3 +443,48 @@ class ProductionAskResponse(BaseModel):
     usedCitationPaths: list[str] = Field(default_factory=list)
     safety: ProductionSafetySummary | None = None
     latencyMs: int
+
+class QueryDetectedEntities(BaseModel):
+    machine: str | None = None
+    baseMachine: str | None = None
+    serialNumber: str | None = None
+    manualType: str | None = None
+    component: str | None = None
+    procedureType: str | None = None
+
+
+class QueryUnderstandingAgentResult(BaseModel):
+    intent: Literal[
+        "maintenance_procedure",
+        "operation_procedure",
+        "safety",
+        "troubleshooting",
+        "error_code",
+        "part_lookup",
+        "specification",
+        "document_lookup",
+        "machine_information",
+        "general_question",
+        "unknown",
+    ]
+    confidence: float = Field(ge=0.0, le=1.0)
+
+    rewrittenQuery: str
+    keywords: list[str] = Field(default_factory=list)
+
+    detectedEntities: QueryDetectedEntities = Field(default_factory=QueryDetectedEntities)
+
+    filters: dict[str, str] = Field(default_factory=dict)
+    filterConfidence: dict[str, float] = Field(default_factory=dict)
+
+    needsClarification: bool = False
+    clarificationQuestion: str | None = None
+
+    reason: str
+
+    @model_validator(mode="after")
+    def validate_query_understanding_filters(self):
+        invalid_fields = set(self.filters.keys()) - set(USER_FILTER_FIELDS)
+        if invalid_fields:
+            raise ValueError(f"Unsupported filter fields for V1: {sorted(invalid_fields)}")
+        return self
