@@ -171,7 +171,11 @@ def graph_state_to_debug_response(state: RagGraphState) -> dict[str, Any]:
             "latencyMs": retrieval.get("latencyMs"),
             "searchMode": state.get("search_mode"),
             "vectorFields": state.get("vector_fields"),
-            "filters": state.get("filters"),
+            "requestFilters": state.get("filters"),
+            "retrievalQuery": retrieval.get("retrievalQuery"),
+            "appliedFilters": retrieval.get("appliedFilters"),
+            "queryUnderstandingFilters": retrieval.get("queryUnderstandingFilters"),
+            "queryUnderstandingFilterConfidence": retrieval.get("queryUnderstandingFilterConfidence"),
         }
 
     if state.get("include_debug_context"):

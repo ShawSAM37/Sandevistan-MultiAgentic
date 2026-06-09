@@ -32,6 +32,55 @@ def _question_for_agents(state: RagGraphState) -> str:
     return sanitized or current
 
 
+QUERY_UNDERSTANDING_FILTER_CONFIDENCE_THRESHOLD = 0.75
+
+
+def _query_understanding_for_retrieval(state: RagGraphState) -> dict[str, Any]:
+    query_understanding = state.get("query_understanding") or {}
+    rewritten_query = (query_understanding.get("rewrittenQuery") or "").strip()
+
+    return {
+        "retrievalQuery": rewritten_query or _question_for_agents(state),
+        "rawFilters": query_understanding.get("filters") or {},
+        "filterConfidence": query_understanding.get("filterConfidence") or {},
+    }
+
+
+def _confident_query_understanding_filters(state: RagGraphState) -> dict[str, str]:
+    query_understanding = state.get("query_understanding") or {}
+    raw_filters = query_understanding.get("filters") or {}
+    filter_confidence = query_understanding.get("filterConfidence") or {}
+
+    confident_filters: dict[str, str] = {}
+
+    for field_name, field_value in raw_filters.items():
+        if field_value is None:
+            continue
+
+        confidence = filter_confidence.get(field_name, 0.0)
+
+        try:
+            confidence_value = float(confidence)
+        except (TypeError, ValueError):
+            confidence_value = 0.0
+
+        if confidence_value >= QUERY_UNDERSTANDING_FILTER_CONFIDENCE_THRESHOLD:
+            confident_filters[field_name] = str(field_value)
+
+    return confident_filters
+
+
+def _merged_retrieval_filters(state: RagGraphState) -> dict[str, str]:
+    query_filters = _confident_query_understanding_filters(state)
+    request_filters = state.get("filters") or {}
+
+    # Explicit request filters win over model-extracted filters.
+    return {
+        **query_filters,
+        **request_filters,
+    }
+
+
 def input_guardrail_node(state: RagGraphState) -> RagGraphState:
     request_id = _request_id(state)
 
@@ -239,11 +288,15 @@ def retrieval_node(state: RagGraphState) -> RagGraphState:
 
     with elapsed_timer() as timer:
         try:
+            retrieval_plan = _query_understanding_for_retrieval(state)
+            retrieval_query = retrieval_plan["retrievalQuery"]
+            applied_filters = _merged_retrieval_filters(state)
+
             result = execute_search(
-                query=_question_for_agents(state),
+                query=retrieval_query,
                 search_mode=state.get("search_mode", "hybrid"),
                 vector_fields=state.get("vector_fields", ["contentVector"]),
-                filters=state.get("filters", {}),
+                filters=applied_filters,
                 top=int(state.get("top", 3)),
                 k=int(state.get("k", 50)),
                 use_semantic_ranker=bool(state.get("use_semantic_ranker", False)),
@@ -258,8 +311,13 @@ def retrieval_node(state: RagGraphState) -> RagGraphState:
                 event="completed",
                 latency_ms=timer["elapsedMs"],
                 input_summary={
-                    "query": _question_for_agents(state),
+                    "originalQuestion": _question_for_agents(state),
+                    "retrievalQuery": retrieval_query,
                     "searchMode": state.get("search_mode", "hybrid"),
+                    "requestFilters": state.get("filters", {}),
+                    "queryUnderstandingFilters": retrieval_plan["rawFilters"],
+                    "queryUnderstandingFilterConfidence": retrieval_plan["filterConfidence"],
+                    "appliedFilters": applied_filters,
                     "top": state.get("top", 3),
                     "k": state.get("k", 50),
                 },
