@@ -488,3 +488,64 @@ class QueryUnderstandingAgentResult(BaseModel):
         if invalid_fields:
             raise ValueError(f"Unsupported filter fields for V1: {sorted(invalid_fields)}")
         return self
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1)
+
+    threadId: str | None = None
+    userId: str | None = None
+
+    searchMode: Literal["keyword", "vector", "hybrid"] = "hybrid"
+    vectorFields: list[Literal["contentVector", "titleVector"]] = Field(
+        default_factory=lambda: ["contentVector"]
+    )
+
+    filters: dict[str, str] = Field(default_factory=dict)
+
+    top: int = Field(default=3, ge=1, le=20)
+    k: int = Field(default=50, ge=1, le=100)
+
+    useSemanticRanker: bool = False
+
+    @model_validator(mode="after")
+    def validate_chat_filters(self):
+        invalid_fields = set(self.filters.keys()) - set(USER_FILTER_FIELDS)
+        if invalid_fields:
+            raise ValueError(f"Unsupported filter fields for V1: {sorted(invalid_fields)}")
+        return self
+
+
+class ChatSafetySummary(BaseModel):
+    safe: bool
+    requiresRevision: bool
+
+
+class ChatDetectedContext(BaseModel):
+    intent: str | None = None
+    machine: str | None = None
+    baseMachine: str | None = None
+    serialNumber: str | None = None
+    manualType: str | None = None
+    component: str | None = None
+    procedureType: str | None = None
+    filters: dict[str, str] = Field(default_factory=dict)
+    rewrittenQuery: str | None = None
+
+
+class ChatMemorySummary(BaseModel):
+    recentTurnCount: int
+    hasConversationSummary: bool
+
+
+class ChatResponse(BaseModel):
+    requestId: str
+    threadId: str
+    answer: str
+    answerFound: bool
+    confidence: float = Field(ge=0.0, le=1.0)
+    detectedContext: ChatDetectedContext
+    citations: list[dict] = Field(default_factory=list)
+    usedCitationPaths: list[str] = Field(default_factory=list)
+    safety: ChatSafetySummary | None = None
+    memory: ChatMemorySummary
+    latencyMs: int
