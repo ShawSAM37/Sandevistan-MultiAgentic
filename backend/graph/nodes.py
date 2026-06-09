@@ -13,7 +13,7 @@ from backend.agents.query_understanding_agent import (
 from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.context.context_builder import build_context_from_documents
-from backend.memory.in_memory_repository import get_memory_repository
+from backend.memory.factory import get_memory_repository
 from backend.memory.models import ChatMessage
 from backend.graph.state import (
     RagGraphState,

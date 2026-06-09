@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     )
 
 
+    # Conversation memory
+    memory_backend: str = "in_memory"
+    azure_table_connection_string: str | None = None
+    azure_table_memory_table_name: str = "SandevistanConversationMemory"
+
+
 settings = Settings()
 
 
