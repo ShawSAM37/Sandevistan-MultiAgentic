@@ -10,11 +10,13 @@ from backend.graph.nodes import (
     context_builder_node,
     final_response_node,
     grounding_critic_node,
+    load_memory_node,
     input_guardrail_node,
     query_understanding_node,
     retrieval_node,
     revision_node,
     safety_critic_node,
+    save_memory_node,
 )
 from backend.graph.state import RagGraphState, create_initial_graph_state
 from backend.observability.logger import log_event
@@ -24,6 +26,7 @@ from backend.observability.logger import log_event
 def build_rag_graph():
     graph = StateGraph(RagGraphState)
 
+    graph.add_node("load_memory", load_memory_node)
     graph.add_node("input_guardrail", input_guardrail_node)
     graph.add_node("query_understanding", query_understanding_node)
     graph.add_node("retrieval", retrieval_node)
@@ -33,8 +36,10 @@ def build_rag_graph():
     graph.add_node("revision", revision_node)
     graph.add_node("safety_critic", safety_critic_node)
     graph.add_node("final_response", final_response_node)
+    graph.add_node("save_memory", save_memory_node)
 
-    graph.add_edge(START, "input_guardrail")
+    graph.add_edge(START, "load_memory")
+    graph.add_edge("load_memory", "input_guardrail")
     graph.add_edge("input_guardrail", "query_understanding")
     graph.add_edge("query_understanding", "retrieval")
     graph.add_edge("retrieval", "context_builder")
@@ -43,7 +48,8 @@ def build_rag_graph():
     graph.add_edge("grounding_critic", "revision")
     graph.add_edge("revision", "safety_critic")
     graph.add_edge("safety_critic", "final_response")
-    graph.add_edge("final_response", END)
+    graph.add_edge("final_response", "save_memory")
+    graph.add_edge("save_memory", END)
 
     return graph.compile()
 
@@ -161,6 +167,10 @@ def graph_state_to_debug_response(state: RagGraphState) -> dict[str, Any]:
         "budgets": state.get("budgets", {}),
         "traceSteps": state.get("trace_steps", []),
         "errors": state.get("errors", []),
+        "memory": {
+            "recentTurnCount": len(state.get("recent_turns", [])),
+            "hasConversationSummary": bool(state.get("conversation_summary")),
+        },
     }
 
     retrieval = state.get("retrieval")

@@ -16,6 +16,19 @@ class GraphNodeContract:
     failed_event: str
 
 
+LOAD_MEMORY_NODE = GraphNodeContract(
+    name="load_memory",
+    model_role=None,
+    reads=("thread_id",),
+    writes=("messages", "conversation_summary", "recent_turns"),
+    max_output_tokens=None,
+    fallback_behavior="Continue with empty memory if memory load fails.",
+    started_event="graph_load_memory_started",
+    completed_event="graph_load_memory_completed",
+    failed_event="graph_load_memory_failed",
+)
+
+
 INPUT_GUARDRAIL_NODE = GraphNodeContract(
     name="input_guardrail",
     model_role="guardrail",
@@ -120,6 +133,19 @@ SAFETY_CRITIC_NODE = GraphNodeContract(
 )
 
 
+SAVE_MEMORY_NODE = GraphNodeContract(
+    name="save_memory",
+    model_role=None,
+    reads=("thread_id", "current_question", "final_answer", "answer_found", "query_understanding", "safety", "citations"),
+    writes=("messages", "recent_turns"),
+    max_output_tokens=None,
+    fallback_behavior="Do not fail the request if memory save fails.",
+    started_event="graph_save_memory_started",
+    completed_event="graph_save_memory_completed",
+    failed_event="graph_save_memory_failed",
+)
+
+
 FINAL_RESPONSE_NODE = GraphNodeContract(
     name="final_response",
     model_role=None,
@@ -136,6 +162,7 @@ FINAL_RESPONSE_NODE = GraphNodeContract(
 GRAPH_NODE_CONTRACTS = {
     contract.name: contract
     for contract in (
+        LOAD_MEMORY_NODE,
         INPUT_GUARDRAIL_NODE,
         QUERY_UNDERSTANDING_NODE,
         RETRIEVAL_NODE,
@@ -145,5 +172,6 @@ GRAPH_NODE_CONTRACTS = {
         REVISION_NODE,
         SAFETY_CRITIC_NODE,
         FINAL_RESPONSE_NODE,
+        SAVE_MEMORY_NODE,
     )
 }

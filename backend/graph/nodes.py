@@ -9,6 +9,8 @@ from backend.agents.query_understanding_agent import understand_query
 from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.context.context_builder import build_context_from_documents
+from backend.memory.in_memory_repository import get_memory_repository
+from backend.memory.models import ChatMessage
 from backend.graph.state import (
     RagGraphState,
     add_graph_error,
@@ -79,6 +81,70 @@ def _merged_retrieval_filters(state: RagGraphState) -> dict[str, str]:
         **query_filters,
         **request_filters,
     }
+
+
+
+def load_memory_node(state: RagGraphState) -> RagGraphState:
+    request_id = _request_id(state)
+    thread_id = state.get("thread_id") or request_id or "default-thread"
+
+    with elapsed_timer() as timer:
+        try:
+            repo = get_memory_repository()
+            memory = repo.get_memory(thread_id)
+
+            recent_turns = [
+                {
+                    "role": turn.role,
+                    "content": turn.content,
+                    "timestamp": turn.timestamp,
+                    "requestId": turn.requestId,
+                    "metadata": turn.metadata,
+                }
+                for turn in memory.recentTurns
+            ]
+
+            state["conversation_summary"] = memory.conversationSummary
+            state["recent_turns"] = recent_turns
+            state["messages"] = recent_turns
+
+            add_trace_step(
+                state,
+                node="load_memory",
+                event="completed",
+                latency_ms=timer["elapsedMs"],
+                input_summary={"threadId": thread_id},
+                output_summary={
+                    "recentTurnCount": len(recent_turns),
+                    "hasConversationSummary": bool(memory.conversationSummary),
+                    "activeContext": memory.activeContext.model_dump(),
+                },
+            )
+
+            return state
+
+        except Exception as exc:
+            add_graph_error(
+                state,
+                node="load_memory",
+                error_type=type(exc).__name__,
+                message=str(exc),
+                recoverable=True,
+            )
+
+            state["conversation_summary"] = ""
+            state["recent_turns"] = []
+            state["messages"] = []
+
+            add_trace_step(
+                state,
+                node="load_memory",
+                event="failed",
+                latency_ms=timer["elapsedMs"],
+                error=str(exc),
+            )
+
+            return state
 
 
 def input_guardrail_node(state: RagGraphState) -> RagGraphState:
@@ -823,7 +889,98 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
     return state
 
 
+
+
+def save_memory_node(state: RagGraphState) -> RagGraphState:
+    request_id = _request_id(state)
+    thread_id = state.get("thread_id") or request_id or "default-thread"
+
+    with elapsed_timer() as timer:
+        try:
+            repo = get_memory_repository()
+
+            user_message = ChatMessage(
+                role="user",
+                content=state.get("current_question", ""),
+                requestId=request_id,
+                metadata={
+                    "sanitizedQuestion": state.get("sanitized_question"),
+                    "queryUnderstanding": state.get("query_understanding"),
+                },
+            )
+
+            assistant_message = ChatMessage(
+                role="assistant",
+                content=state.get("final_answer", ""),
+                requestId=request_id,
+                metadata={
+                    "answerFound": state.get("answer_found"),
+                    "finalConfidence": state.get("final_confidence"),
+                    "finalUsedCitationPaths": state.get("final_used_citation_paths", []),
+                    "safety": state.get("safety"),
+                    "citationCount": len(state.get("citations", [])),
+                },
+            )
+
+            memory = repo.append_turns(
+                thread_id=thread_id,
+                user_message=user_message,
+                assistant_message=assistant_message,
+                max_recent_turns=int((state.get("budgets") or {}).get("maxRecentTurns", 4)) * 2,
+            )
+
+            recent_turns = [
+                {
+                    "role": turn.role,
+                    "content": turn.content,
+                    "timestamp": turn.timestamp,
+                    "requestId": turn.requestId,
+                    "metadata": turn.metadata,
+                }
+                for turn in memory.recentTurns
+            ]
+
+            state["recent_turns"] = recent_turns
+            state["messages"] = recent_turns
+
+            add_trace_step(
+                state,
+                node="save_memory",
+                event="completed",
+                latency_ms=timer["elapsedMs"],
+                input_summary={
+                    "threadId": thread_id,
+                    "answerFound": state.get("answer_found"),
+                },
+                output_summary={
+                    "recentTurnCount": len(recent_turns),
+                },
+            )
+
+            return state
+
+        except Exception as exc:
+            add_graph_error(
+                state,
+                node="save_memory",
+                error_type=type(exc).__name__,
+                message=str(exc),
+                recoverable=True,
+            )
+
+            add_trace_step(
+                state,
+                node="save_memory",
+                event="failed",
+                latency_ms=timer["elapsedMs"],
+                error=str(exc),
+            )
+
+            return state
+
+
 GRAPH_NODE_FUNCTIONS: dict[str, Any] = {
+    "load_memory": load_memory_node,
     "input_guardrail": input_guardrail_node,
     "query_understanding": query_understanding_node,
     "retrieval": retrieval_node,
@@ -833,4 +990,5 @@ GRAPH_NODE_FUNCTIONS: dict[str, Any] = {
     "revision": revision_node,
     "safety_critic": safety_critic_node,
     "final_response": final_response_node,
+    "save_memory": save_memory_node,
 }
