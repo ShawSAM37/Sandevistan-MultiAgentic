@@ -17,6 +17,8 @@ from backend.models import (
     DebugRetrievalRequest,
     DebugRevisionRequest,
     DebugSafetyRequest,
+    ProductionAskRequest,
+    ProductionAskResponse,
 )
 from backend.observability.logger import log_event
 from backend.observability.request_context import new_request_id
@@ -952,6 +954,108 @@ async def debug_graph_answer(request: DebugGraphAnswerRequest):
         llmCallsUsed=graph_state.get("budgets", {}).get("llmCallsUsed"),
         revisionCount=graph_state.get("budgets", {}).get("revisionCount"),
         traceStepCount=len(graph_state.get("trace_steps", [])),
+        errorCount=len(graph_state.get("errors", [])),
+        endpointLatencyMs=timer["elapsedMs"],
+    )
+
+    return response
+
+
+
+@app.post("/ask", response_model=ProductionAskResponse)
+async def ask(request: ProductionAskRequest):
+    request_id = new_request_id()
+
+    log_event(
+        event="ask_request_received",
+        request_id=request_id,
+        threadId=request.threadId,
+        question=request.question,
+        searchMode=request.searchMode,
+        filters=request.filters,
+        top=request.top,
+        k=request.k,
+        vectorFields=request.vectorFields,
+        useSemanticRanker=request.useSemanticRanker,
+    )
+
+    with elapsed_timer() as timer:
+        graph_state = run_rag_graph(
+            request_id=request_id,
+            question=request.question,
+            thread_id=request.threadId,
+            user_id=request.userId,
+            search_mode=request.searchMode,
+            vector_fields=request.vectorFields,
+            filters=request.filters,
+            top=request.top,
+            k=request.k,
+            use_semantic_ranker=request.useSemanticRanker,
+            include_debug_context=False,
+            max_context_chars=settings.max_context_chars,
+            max_chars_per_document=settings.max_chars_per_document,
+            answer_max_completion_tokens=settings.answer_max_completion_tokens,
+            critic_max_completion_tokens=settings.critic_max_completion_tokens,
+            revision_max_completion_tokens=settings.revision_max_completion_tokens,
+            max_llm_calls=settings.max_llm_calls_per_request,
+            max_revision_count=settings.max_revision_count,
+            max_recent_turns=settings.max_recent_turns,
+            conversation_summary_max_chars=settings.conversation_summary_max_chars,
+        )
+
+    guardrail = graph_state.get("guardrail") or {}
+    safety = graph_state.get("safety") or None
+
+    if guardrail.get("allowed") is False:
+        answer = (
+            "I cannot help with that request. Please ask a safe, manual-related question about Sandvik rotary equipment."
+        )
+        answer_found = False
+        confidence = 0.0
+        citations = []
+        used_citation_paths = []
+        safety_summary = None
+    else:
+        answer = graph_state.get("final_answer") or (
+            "I could not find enough information in the retrieved manual context to answer this question."
+        )
+        answer_found = bool(graph_state.get("answer_found", False))
+        confidence = float(graph_state.get("final_confidence", 0.0))
+        citations = graph_state.get("citations", [])
+        used_citation_paths = graph_state.get("final_used_citation_paths", [])
+        safety_summary = (
+            {
+                "safe": bool(safety.get("safe", False)),
+                "requiresRevision": bool(safety.get("requiresRevision", False)),
+            }
+            if safety
+            else None
+        )
+
+    response = {
+        "requestId": request_id,
+        "threadId": graph_state.get("thread_id", request.threadId or request_id),
+        "answer": answer,
+        "answerFound": answer_found,
+        "confidence": confidence,
+        "citations": citations,
+        "usedCitationPaths": used_citation_paths,
+        "safety": safety_summary,
+        "latencyMs": timer["elapsedMs"],
+    }
+
+    log_event(
+        event="ask_request_completed",
+        request_id=request_id,
+        threadId=response["threadId"],
+        answerFound=response["answerFound"],
+        confidence=response["confidence"],
+        citationCount=len(response["citations"]),
+        usedCitationPathCount=len(response["usedCitationPaths"]),
+        safetySafe=response["safety"]["safe"] if response["safety"] else None,
+        safetyRequiresRevision=response["safety"]["requiresRevision"] if response["safety"] else None,
+        llmCallsUsed=graph_state.get("budgets", {}).get("llmCallsUsed"),
+        revisionCount=graph_state.get("budgets", {}).get("revisionCount"),
         errorCount=len(graph_state.get("errors", [])),
         endpointLatencyMs=timer["elapsedMs"],
     )
