@@ -57,10 +57,130 @@ def build_recent_turns_json(recent_turns: list[dict[str, Any]] | None) -> str:
     return json.dumps(compact_turns, ensure_ascii=False, indent=2)
 
 
+MACHINE_PATTERN = re.compile(
+    r"\b(?P<machine>(?:DR|DI|D)\s*-?\s*\d{2,4}\s*(?:i|I|KX|kx)?)\b",
+    flags=re.IGNORECASE,
+)
+
+KNOWN_COMPONENT_PATTERNS = [
+    "hydraulic tank breather filter",
+    "hydraulic tank air filter",
+    "breather filter",
+    "air filter",
+    "hydraulic filter",
+]
+
+
+def normalize_machine_name(raw_value: str) -> str:
+    compact = re.sub(r"[\s\-]+", "", raw_value.strip())
+
+    match = re.match(r"^(DR|DI)(\d{2,4})(i)?$", compact, flags=re.IGNORECASE)
+    if match:
+        prefix = match.group(1).upper()
+        digits = match.group(2)
+        suffix = "i" if match.group(3) else ""
+        return f"{prefix}{digits}{suffix}"
+
+    match = re.match(r"^(D)(\d{2,4})(KX)?$", compact, flags=re.IGNORECASE)
+    if match:
+        prefix = match.group(1).upper()
+        digits = match.group(2)
+        suffix = "KX" if match.group(3) else ""
+        return f"{prefix}{digits}{suffix}"
+
+    return compact
+
+
+def extract_base_machine_from_text(text: str) -> str | None:
+    if not text:
+        return None
+
+    match = MACHINE_PATTERN.search(text)
+    if not match:
+        return None
+
+    return normalize_machine_name(match.group("machine"))
+
+
+def extract_component_from_text(text: str) -> str | None:
+    normalized = text.lower()
+
+    for component in KNOWN_COMPONENT_PATTERNS:
+        if component in normalized:
+            return component
+
+    return None
+
+
+def append_keyword_once(keywords: list[str], value: str | None) -> list[str]:
+    if not value:
+        return keywords
+
+    existing = {keyword.lower() for keyword in keywords}
+
+    if value.lower() not in existing:
+        keywords.append(value)
+
+    return keywords
+
+
+def apply_deterministic_query_understanding_fallback(
+    question: str,
+    result: QueryUnderstandingAgentResult,
+) -> QueryUnderstandingAgentResult:
+    """Fill obvious machine/component hints when the model misses them.
+
+    Rules:
+    - Do not override model-provided entities.
+    - Do not override model-provided filters.
+    - Only add baseMachine when the text clearly contains a machine-like token.
+    - Set high confidence only for deterministic exact-looking machine extraction.
+    """
+
+    detected_base_machine = extract_base_machine_from_text(question)
+    detected_component = extract_component_from_text(question)
+
+    if detected_base_machine and not result.detectedEntities.baseMachine:
+        result.detectedEntities.baseMachine = detected_base_machine
+
+    if detected_component and not result.detectedEntities.component:
+        result.detectedEntities.component = detected_component
+
+    if detected_base_machine and "baseMachine" not in result.filters:
+        result.filters["baseMachine"] = detected_base_machine
+        result.filterConfidence["baseMachine"] = 0.95
+
+    if detected_component:
+        result.keywords = append_keyword_once(result.keywords, detected_component)
+
+    if detected_base_machine:
+        result.keywords = append_keyword_once(result.keywords, detected_base_machine)
+
+    if not result.rewrittenQuery or not result.rewrittenQuery.strip():
+        result.rewrittenQuery = question.strip()
+
+    # If the rewritten query does not mention the deterministic component/machine,
+    # append them softly to improve retrieval without inventing content.
+    rewritten_lower = result.rewrittenQuery.lower()
+
+    additions: list[str] = []
+
+    if detected_base_machine and detected_base_machine.lower() not in rewritten_lower:
+        additions.append(detected_base_machine)
+
+    if detected_component and detected_component.lower() not in rewritten_lower:
+        additions.append(detected_component)
+
+    if additions:
+        result.rewrittenQuery = f"{result.rewrittenQuery.strip()} {' '.join(additions)}".strip()
+
+    return result
+
+
 def query_understanding_fallback(question: str, reason: str) -> QueryUnderstandingAgentResult:
     cleaned_question = question.strip()
 
-    return QueryUnderstandingAgentResult(
+    result = QueryUnderstandingAgentResult(
         intent="unknown",
         confidence=0.0,
         rewrittenQuery=cleaned_question,
@@ -71,6 +191,11 @@ def query_understanding_fallback(question: str, reason: str) -> QueryUnderstandi
         needsClarification=False,
         clarificationQuestion=None,
         reason=reason,
+    )
+
+    return apply_deterministic_query_understanding_fallback(
+        question=question,
+        result=result,
     )
 
 
@@ -217,6 +342,10 @@ def understand_query(
             raw_text = response.choices[0].message.content or ""
             parsed = extract_json_object(raw_text)
             result = QueryUnderstandingAgentResult(**parsed)
+            result = apply_deterministic_query_understanding_fallback(
+                question=question,
+                result=result,
+            )
 
             log_event(
                 event="query_understanding_completed",
