@@ -5,7 +5,11 @@ from typing import Any
 from backend.agents.answer_generation_agent import generate_answer_from_context
 from backend.agents.grounding_critic_agent import evaluate_grounding
 from backend.agents.input_guardrail_agent import run_input_guardrail_agent
-from backend.agents.query_understanding_agent import understand_query
+from backend.agents.query_understanding_agent import (
+    extract_base_machine_from_text,
+    extract_component_from_text,
+    understand_query,
+)
 from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.context.context_builder import build_context_from_documents
@@ -81,6 +85,56 @@ def _merged_retrieval_filters(state: RagGraphState) -> dict[str, str]:
         **query_filters,
         **request_filters,
     }
+
+
+def _recent_turns_text(state: RagGraphState, max_chars: int = 4000) -> str:
+    recent_turns = state.get("recent_turns") or []
+    parts: list[str] = []
+
+    for turn in recent_turns[-6:]:
+        role = turn.get("role", "")
+        content = turn.get("content", "")
+        if content:
+            parts.append(f"{role}: {content}")
+
+    combined = "\n".join(parts)
+    return combined[-max_chars:]
+
+
+def _apply_memory_context_to_query_understanding(
+    state: RagGraphState,
+    result: Any,
+) -> Any:
+    """Use recent turns as deterministic context when current query lacks machine/component.
+
+    This does not override entities/filters already detected from the current question.
+    """
+
+    memory_text = _recent_turns_text(state)
+
+    if not memory_text:
+        return result
+
+    detected_memory_base_machine = extract_base_machine_from_text(memory_text)
+    detected_memory_component = extract_component_from_text(memory_text)
+
+    if detected_memory_base_machine and not result.detectedEntities.baseMachine:
+        result.detectedEntities.baseMachine = detected_memory_base_machine
+
+        if "baseMachine" not in result.filters:
+            result.filters["baseMachine"] = detected_memory_base_machine
+            result.filterConfidence["baseMachine"] = 0.9
+
+    if detected_memory_component and not result.detectedEntities.component:
+        result.detectedEntities.component = detected_memory_component
+
+    if detected_memory_base_machine:
+        rewritten_query = result.rewrittenQuery or _question_for_agents(state)
+
+        if detected_memory_base_machine.lower() not in rewritten_query.lower():
+            result.rewrittenQuery = f"{rewritten_query} {detected_memory_base_machine}".strip()
+
+    return result
 
 
 
@@ -274,6 +328,11 @@ def query_understanding_node(state: RagGraphState) -> RagGraphState:
                 conversation_summary=state.get("conversation_summary", ""),
                 recent_turns=state.get("recent_turns", []),
                 request_id=request_id,
+            )
+
+            result = _apply_memory_context_to_query_understanding(
+                state=state,
+                result=result,
             )
 
             state["query_understanding"] = result.model_dump()

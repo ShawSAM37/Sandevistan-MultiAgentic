@@ -57,8 +57,8 @@ def build_recent_turns_json(recent_turns: list[dict[str, Any]] | None) -> str:
     return json.dumps(compact_turns, ensure_ascii=False, indent=2)
 
 
-MACHINE_PATTERN = re.compile(
-    r"\b(?P<machine>(?:DR|DI|D)\s*-?\s*\d{2,4}\s*(?:i|I|KX|kx)?)\b",
+BASE_MACHINE_PATTERN = re.compile(
+    r"\b(?P<machine>(?:DR|DI)\s*-?\s*\d{2,4}\s*(?:i|I)|D\s*-?\s*\d{2,4}\s*(?:KX|kx))\b",
     flags=re.IGNORECASE,
 )
 
@@ -81,11 +81,11 @@ def normalize_machine_name(raw_value: str) -> str:
         suffix = "i" if match.group(3) else ""
         return f"{prefix}{digits}{suffix}"
 
-    match = re.match(r"^(D)(\d{2,4})(KX)?$", compact, flags=re.IGNORECASE)
+    match = re.match(r"^(D)(\d{2,4})(KX)$", compact, flags=re.IGNORECASE)
     if match:
         prefix = match.group(1).upper()
         digits = match.group(2)
-        suffix = "KX" if match.group(3) else ""
+        suffix = "KX"
         return f"{prefix}{digits}{suffix}"
 
     return compact
@@ -95,7 +95,7 @@ def extract_base_machine_from_text(text: str) -> str | None:
     if not text:
         return None
 
-    match = MACHINE_PATTERN.search(text)
+    match = BASE_MACHINE_PATTERN.search(text)
     if not match:
         return None
 
