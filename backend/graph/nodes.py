@@ -5,6 +5,7 @@ from typing import Any
 from backend.agents.answer_generation_agent import generate_answer_from_context
 from backend.agents.grounding_critic_agent import evaluate_grounding
 from backend.agents.input_guardrail_agent import run_input_guardrail_agent
+from backend.agents.query_understanding_agent import understand_query
 from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.context.context_builder import build_context_from_documents
@@ -97,6 +98,129 @@ def input_guardrail_node(state: RagGraphState) -> RagGraphState:
             )
             state["final_confidence"] = 0.0
             state["final_used_citation_paths"] = []
+            return state
+
+
+
+
+def query_understanding_node(state: RagGraphState) -> RagGraphState:
+    request_id = _request_id(state)
+    guardrail = state.get("guardrail") or {}
+
+    if guardrail and guardrail.get("allowed") is False:
+        add_trace_step(
+            state,
+            node="query_understanding",
+            event="skipped",
+            input_summary={"reason": "Guardrail blocked request."},
+        )
+        return state
+
+    if not llm_budget_remaining(state):
+        state["query_understanding"] = {
+            "intent": "unknown",
+            "confidence": 0.0,
+            "rewrittenQuery": _question_for_agents(state),
+            "keywords": [],
+            "detectedEntities": {
+                "machine": None,
+                "baseMachine": None,
+                "serialNumber": None,
+                "manualType": None,
+                "component": None,
+                "procedureType": None,
+            },
+            "filters": {},
+            "filterConfidence": {},
+            "needsClarification": False,
+            "clarificationQuestion": None,
+            "reason": "Query understanding skipped because LLM budget was exhausted.",
+        }
+
+        add_trace_step(
+            state,
+            node="query_understanding",
+            event="skipped",
+            input_summary={"reason": "LLM budget exhausted."},
+            output_summary={
+                "intent": "unknown",
+                "confidence": 0.0,
+                "filterCount": 0,
+            },
+        )
+        return state
+
+    increment_llm_call_count(state)
+
+    with elapsed_timer() as timer:
+        try:
+            result = understand_query(
+                question=_question_for_agents(state),
+                conversation_summary=state.get("conversation_summary", ""),
+                recent_turns=state.get("recent_turns", []),
+                request_id=request_id,
+            )
+
+            state["query_understanding"] = result.model_dump()
+
+            add_trace_step(
+                state,
+                node="query_understanding",
+                event="completed",
+                latency_ms=timer["elapsedMs"],
+                input_summary={
+                    "question": _question_for_agents(state),
+                    "recentTurnCount": len(state.get("recent_turns", [])),
+                    "hasConversationSummary": bool(state.get("conversation_summary")),
+                },
+                output_summary={
+                    "intent": result.intent,
+                    "confidence": result.confidence,
+                    "rewrittenQuery": result.rewrittenQuery,
+                    "filters": result.filters,
+                    "needsClarification": result.needsClarification,
+                },
+            )
+
+            return state
+
+        except Exception as exc:
+            add_graph_error(
+                state,
+                node="query_understanding",
+                error_type=type(exc).__name__,
+                message=str(exc),
+                recoverable=True,
+            )
+
+            state["query_understanding"] = {
+                "intent": "unknown",
+                "confidence": 0.0,
+                "rewrittenQuery": _question_for_agents(state),
+                "keywords": [],
+                "detectedEntities": {
+                    "machine": None,
+                    "baseMachine": None,
+                    "serialNumber": None,
+                    "manualType": None,
+                    "component": None,
+                    "procedureType": None,
+                },
+                "filters": {},
+                "filterConfidence": {},
+                "needsClarification": False,
+                "clarificationQuestion": None,
+                "reason": "Query understanding node failed; using original question without filters.",
+            }
+
+            add_trace_step(
+                state,
+                node="query_understanding",
+                event="failed",
+                latency_ms=timer["elapsedMs"],
+                error=str(exc),
+            )
+
             return state
 
 
@@ -643,6 +767,7 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
 
 GRAPH_NODE_FUNCTIONS: dict[str, Any] = {
     "input_guardrail": input_guardrail_node,
+    "query_understanding": query_understanding_node,
     "retrieval": retrieval_node,
     "context_builder": context_builder_node,
     "answer_generation": answer_generation_node,

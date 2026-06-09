@@ -74,6 +74,7 @@ class RagGraphState(TypedDict, total=False):
 
     # Agent outputs
     guardrail: dict[str, Any] | None
+    query_understanding: dict[str, Any] | None
     retrieval: dict[str, Any] | None
     context: str
     context_char_count: int
@@ -144,6 +145,7 @@ def create_initial_graph_state(
         "use_semantic_ranker": use_semantic_ranker,
         "include_debug_context": include_debug_context,
         "guardrail": None,
+        "query_understanding": None,
         "retrieval": None,
         "context": "",
         "context_char_count": 0,

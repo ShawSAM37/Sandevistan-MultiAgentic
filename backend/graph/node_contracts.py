@@ -29,6 +29,19 @@ INPUT_GUARDRAIL_NODE = GraphNodeContract(
 )
 
 
+QUERY_UNDERSTANDING_NODE = GraphNodeContract(
+    name="query_understanding",
+    model_role="planner",
+    reads=("current_question", "conversation_summary", "recent_turns", "guardrail", "budgets"),
+    writes=("query_understanding",),
+    max_output_tokens=300,
+    fallback_behavior="Use original sanitized question with no filters if query understanding fails.",
+    started_event="graph_query_understanding_started",
+    completed_event="graph_query_understanding_completed",
+    failed_event="graph_query_understanding_failed",
+)
+
+
 RETRIEVAL_NODE = GraphNodeContract(
     name="retrieval",
     model_role=None,
@@ -124,6 +137,7 @@ GRAPH_NODE_CONTRACTS = {
     contract.name: contract
     for contract in (
         INPUT_GUARDRAIL_NODE,
+        QUERY_UNDERSTANDING_NODE,
         RETRIEVAL_NODE,
         CONTEXT_BUILDER_NODE,
         ANSWER_GENERATION_NODE,

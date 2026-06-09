@@ -11,6 +11,7 @@ from backend.graph.nodes import (
     final_response_node,
     grounding_critic_node,
     input_guardrail_node,
+    query_understanding_node,
     retrieval_node,
     revision_node,
     safety_critic_node,
@@ -24,6 +25,7 @@ def build_rag_graph():
     graph = StateGraph(RagGraphState)
 
     graph.add_node("input_guardrail", input_guardrail_node)
+    graph.add_node("query_understanding", query_understanding_node)
     graph.add_node("retrieval", retrieval_node)
     graph.add_node("context_builder", context_builder_node)
     graph.add_node("answer_generation", answer_generation_node)
@@ -33,7 +35,8 @@ def build_rag_graph():
     graph.add_node("final_response", final_response_node)
 
     graph.add_edge(START, "input_guardrail")
-    graph.add_edge("input_guardrail", "retrieval")
+    graph.add_edge("input_guardrail", "query_understanding")
+    graph.add_edge("query_understanding", "retrieval")
     graph.add_edge("retrieval", "context_builder")
     graph.add_edge("context_builder", "answer_generation")
     graph.add_edge("answer_generation", "grounding_critic")
@@ -136,6 +139,7 @@ def graph_state_to_debug_response(state: RagGraphState) -> dict[str, Any]:
         "query": state.get("current_question"),
         "sanitizedQuestion": state.get("sanitized_question"),
         "guardrail": state.get("guardrail"),
+        "queryUnderstanding": state.get("query_understanding"),
         "answer": (state.get("answer") or {}).get("answer") if state.get("answer") else None,
         "answerFound": state.get("answer_found", False),
         "confidence": (state.get("answer") or {}).get("confidence", 0.0) if state.get("answer") else 0.0,
