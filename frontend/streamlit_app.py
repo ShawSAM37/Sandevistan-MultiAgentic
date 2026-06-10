@@ -34,7 +34,7 @@ def disable_insecure_warnings_if_needed(verify_ssl: bool) -> None:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-def post_ask(
+def post_chat(
     *,
     backend_url: str,
     question: str,
@@ -42,10 +42,10 @@ def post_ask(
     timeout_seconds: int,
     verify_ssl: bool,
 ) -> dict[str, Any]:
-    url = normalize_backend_url(backend_url) + "/ask"
+    url = normalize_backend_url(backend_url) + "/chat"
 
     payload = {
-        "question": question,
+        "message": question,
         "threadId": thread_id,
         "searchMode": "hybrid",
         "vectorFields": ["contentVector"],
@@ -158,6 +158,8 @@ def render_assistant_response(message: dict[str, Any]) -> None:
                     "answerFound": answer_found,
                     "confidence": confidence,
                     "safety": safety,
+                    "detectedContext": result.get("detectedContext"),
+                    "memory": result.get("memory"),
                     "usedCitationPaths": list(used_paths),
                     "latencyMs": latency_ms,
                 }
@@ -188,7 +190,7 @@ def main() -> None:
     with st.sidebar:
         st.title("⚙️ Sandevistan")
 
-        st.caption("Chat interface for Sandvik rotary instruction manuals.")
+        st.caption("Memory-aware chat interface for Sandvik rotary instruction manuals.")
 
         if st.button("New chat", type="primary"):
             new_chat()
@@ -255,7 +257,7 @@ def main() -> None:
         with st.chat_message("assistant"):
             with st.spinner("Searching manuals and checking safety..."):
                 try:
-                    result = post_ask(
+                    result = post_chat(
                         backend_url=backend_url,
                         question=question,
                         thread_id=st.session_state.thread_id,
