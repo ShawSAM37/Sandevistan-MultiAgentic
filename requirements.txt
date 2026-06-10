@@ -26,3 +26,4 @@ pytest
 pytest-asyncio
 ruff
 requests
+azure-data-tables>=12.7.0
