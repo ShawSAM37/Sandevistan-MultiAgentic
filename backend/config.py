@@ -29,17 +29,17 @@ class Settings(BaseSettings):
     vector_dimensions: int = 1024
 
     default_top_k: int = 10
-    max_context_chars: int = 30000
-    max_chars_per_document: int = 6000
+    max_context_chars: int = 40000
+    max_chars_per_document: int = 8000
     max_revision_count: int = 1
     max_search_plans: int = 3
     max_llm_calls_per_request: int = 6
     request_timeout_seconds: int = 60
 
-    answer_max_completion_tokens: int = 6000
+    answer_max_completion_tokens: int = 10000
     guardrail_max_completion_tokens: int = 200
-    critic_max_completion_tokens: int = 1500
-    revision_max_completion_tokens: int = 6000
+    critic_max_completion_tokens: int = 2000
+    revision_max_completion_tokens: int = 10000
 
     openai_chat_min_interval_seconds: float = 8.0
     openai_chat_retry_count: int = 2
