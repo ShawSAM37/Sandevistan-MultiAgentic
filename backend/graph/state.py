@@ -58,6 +58,7 @@ class RagGraphState(TypedDict, total=False):
     messages: list[dict[str, Any]]
     conversation_summary: str
     recent_turns: list[dict[str, Any]]
+    active_context: dict[str, Any]
 
     # Current request
     current_question: str
@@ -135,6 +136,7 @@ def create_initial_graph_state(
         "messages": [],
         "conversation_summary": "",
         "recent_turns": [],
+        "active_context": {},
         "current_question": question,
         "sanitized_question": "",
         "search_mode": search_mode,

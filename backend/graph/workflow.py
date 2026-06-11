@@ -170,6 +170,7 @@ def graph_state_to_debug_response(state: RagGraphState) -> dict[str, Any]:
         "memory": {
             "recentTurnCount": len(state.get("recent_turns", [])),
             "hasConversationSummary": bool(state.get("conversation_summary")),
+            "activeContext": state.get("active_context", {}),
         },
     }
 
