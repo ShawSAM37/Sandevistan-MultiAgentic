@@ -950,6 +950,68 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
 
 
 
+
+def _truncate_summary_text(value: str, max_chars: int) -> str:
+    cleaned = " ".join((value or "").split())
+    if len(cleaned) <= max_chars:
+        return cleaned
+    return cleaned[: max_chars - 3].rstrip() + "..."
+
+
+def _updated_conversation_summary_from_state(
+    current_summary: str,
+    active_context: "ActiveConversationContext",
+    state: "RagGraphState",
+) -> str:
+    """Create a compact deterministic summary for memory persistence.
+
+    This avoids an extra LLM call while still making future query understanding
+    aware of the active machine/component context and latest exchange.
+    """
+    budgets = state.get("budgets") or {}
+    max_chars = int(budgets.get("conversationSummaryMaxChars", 2000))
+
+    context_parts = []
+    if active_context.machine:
+        context_parts.append(f"machine={active_context.machine}")
+    if active_context.baseMachine:
+        context_parts.append(f"baseMachine={active_context.baseMachine}")
+    if active_context.serialNumber:
+        context_parts.append(f"serialNumber={active_context.serialNumber}")
+    if active_context.manualType:
+        context_parts.append(f"manualType={active_context.manualType}")
+    if active_context.component:
+        context_parts.append(f"component={active_context.component}")
+    if active_context.intent:
+        context_parts.append(f"intent={active_context.intent}")
+    context_text = "; ".join(context_parts) if context_parts else "none"
+
+    user_question = state.get("current_question", "")
+    final_answer = state.get("final_answer", "")
+    answer_found = state.get("answer_found")
+    final_confidence = state.get("final_confidence")
+    used_paths = state.get("final_used_citation_paths", []) or []
+
+    answer_preview = _truncate_summary_text(final_answer, 500)
+    new_summary = (
+        f"Active context: {context_text}. "
+        f"Latest user request: {user_question}. "
+        f"Latest answerFound={answer_found}, confidence={final_confidence}. "
+        f"Latest answer summary: {answer_preview} "
+        f"Used citation path count: {len(used_paths)}."
+    )
+
+    if current_summary:
+        combined = (
+            f"Previous summary: {_truncate_summary_text(current_summary, 700)} "
+            f"Updated summary: {new_summary}"
+        )
+    else:
+        combined = new_summary
+
+    return _truncate_summary_text(combined, max_chars)
+
+
 def save_memory_node(state: RagGraphState) -> RagGraphState:
     request_id = _request_id(state)
     thread_id = state.get("thread_id") or request_id or "default-thread"
