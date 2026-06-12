@@ -80,6 +80,8 @@ class RagGraphState(TypedDict, total=False):
     context: str
     context_char_count: int
     citations: list[dict[str, Any]]
+    candidate_image_references: list[dict[str, Any]]
+    image_references: list[dict[str, Any]]
     used_documents: list[dict[str, Any]]
     skipped_documents: list[dict[str, Any]]
 
@@ -152,6 +154,8 @@ def create_initial_graph_state(
         "context": "",
         "context_char_count": 0,
         "citations": [],
+        "candidate_image_references": [],
+        "image_references": [],
         "used_documents": [],
         "skipped_documents": [],
         "answer": None,
