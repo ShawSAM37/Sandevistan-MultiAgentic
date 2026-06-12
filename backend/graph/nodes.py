@@ -14,7 +14,7 @@ from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.context.context_builder import build_context_from_documents
 from backend.memory.factory import get_memory_repository
-from backend.memory.models import ChatMessage
+from backend.memory.models import ActiveConversationContext, ChatMessage
 from backend.graph.state import (
     RagGraphState,
     add_graph_error,
@@ -111,12 +111,19 @@ def _apply_memory_context_to_query_understanding(
     """
 
     memory_text = _recent_turns_text(state)
+    active_context = state.get("active_context") or {}
 
-    if not memory_text:
+    if not memory_text and not active_context:
         return result
 
-    detected_memory_base_machine = extract_base_machine_from_text(memory_text)
-    detected_memory_component = extract_component_from_text(memory_text)
+    detected_memory_base_machine = (
+        active_context.get("baseMachine")
+        or extract_base_machine_from_text(memory_text)
+    )
+    detected_memory_component = (
+        active_context.get("component")
+        or extract_component_from_text(memory_text)
+    )
 
     if detected_memory_base_machine and not result.detectedEntities.baseMachine:
         result.detectedEntities.baseMachine = detected_memory_base_machine
@@ -161,6 +168,7 @@ def load_memory_node(state: RagGraphState) -> RagGraphState:
             state["conversation_summary"] = memory.conversationSummary
             state["recent_turns"] = recent_turns
             state["messages"] = recent_turns
+            state["active_context"] = memory.activeContext.model_dump()
 
             add_trace_step(
                 state,
@@ -951,6 +959,53 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
 
 
 
+
+def _updated_active_context_from_state(
+    current_context: ActiveConversationContext,
+    state: RagGraphState,
+) -> ActiveConversationContext:
+    query_understanding = state.get("query_understanding") or {}
+    detected_entities = query_understanding.get("detectedEntities") or {}
+
+    context = current_context.model_copy(deep=True)
+
+    for field_name in ["machine", "baseMachine", "serialNumber", "manualType", "component"]:
+        value = detected_entities.get(field_name)
+        if value:
+            setattr(context, field_name, value)
+
+    intent = query_understanding.get("intent")
+    if intent and intent != "unknown":
+        context.intent = intent
+
+    return context
+
+
+def _active_context_from_query_understanding_metadata(
+    current_context: ActiveConversationContext,
+    query_understanding: dict[str, Any] | None,
+) -> ActiveConversationContext:
+    """Fallback active-context updater using queryUnderstanding metadata."""
+
+    if not query_understanding:
+        return current_context
+
+    detected_entities = query_understanding.get("detectedEntities") or {}
+
+    context = current_context.model_copy(deep=True)
+
+    for field_name in ["machine", "baseMachine", "serialNumber", "manualType", "component"]:
+        value = detected_entities.get(field_name)
+        if value:
+            setattr(context, field_name, value)
+
+    intent = query_understanding.get("intent")
+    if intent and intent != "unknown":
+        context.intent = intent
+
+    return context
+
+
 def _truncate_summary_text(value: str, max_chars: int) -> str:
     cleaned = " ".join((value or "").split())
     if len(cleaned) <= max_chars:
@@ -1050,6 +1105,22 @@ def save_memory_node(state: RagGraphState) -> RagGraphState:
                 max_recent_turns=int((state.get("budgets") or {}).get("maxRecentTurns", 4)) * 2,
             )
 
+            memory.activeContext = _updated_active_context_from_state(
+                current_context=memory.activeContext,
+                state=state,
+            )
+            memory.activeContext = _active_context_from_query_understanding_metadata(
+                current_context=memory.activeContext,
+                query_understanding=user_message.metadata.get("queryUnderstanding"),
+            )
+            memory.conversationSummary = _updated_conversation_summary_from_state(
+                current_summary=memory.conversationSummary,
+                active_context=memory.activeContext,
+                state=state,
+            )
+
+            repo.save_memory(memory)
+
             recent_turns = [
                 {
                     "role": turn.role,
@@ -1063,6 +1134,8 @@ def save_memory_node(state: RagGraphState) -> RagGraphState:
 
             state["recent_turns"] = recent_turns
             state["messages"] = recent_turns
+            state["active_context"] = memory.activeContext.model_dump()
+            state["conversation_summary"] = memory.conversationSummary
 
             add_trace_step(
                 state,
@@ -1075,6 +1148,9 @@ def save_memory_node(state: RagGraphState) -> RagGraphState:
                 },
                 output_summary={
                     "recentTurnCount": len(recent_turns),
+                    "activeContext": memory.activeContext.model_dump(),
+                    "hasConversationSummary": bool(memory.conversationSummary),
+                    "conversationSummaryCharCount": len(memory.conversationSummary or ""),
                 },
             )
 
