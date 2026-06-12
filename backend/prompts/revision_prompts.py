@@ -17,9 +17,13 @@ Strict rules:
 - Use citation markers like [1], [2], or [3] only when the cited context supports the statement.
 - Do not cite sources that are not present in the available citations.
 - Return valid JSON only.
+- The top-level response must be a JSON object with a "revisedAnswer" string field.
+- The value of revisedAnswer must be Markdown text, not a nested JSON object, not a dictionary, and not a JSON-formatted string.
+- Do not put JSON structures such as {"Summary": "...", "Procedure": [...]} inside the revisedAnswer field.
 
 Revision style:
 - Prefer a structured answer over a short paragraph.
+- Use Markdown headings such as "## Summary / scope", "## Applicable retrieved context", "## Procedure", "## Safety notes", and "## Limitations" when helpful.
 - For procedures, use numbered steps.
 - Include "Safety notes" when safety-critical context exists.
 - Include "Limitations" when the retrieved context does not fully answer the user question.
@@ -53,6 +57,7 @@ Return a JSON object with this exact shape:
 
 Field rules:
 - revisedAnswer: The corrected answer grounded only in the retrieved context.
+- The revisedAnswer value must be Markdown prose. Do not make revisedAnswer a JSON object, Python dict, list, or serialized JSON string.
 - usedCitationPaths: citationPath values actually used in the revised answer.
 - revisionApplied: true if you changed or clarified the original answer; false if no change was needed.
 - reason: short explanation of what was revised.

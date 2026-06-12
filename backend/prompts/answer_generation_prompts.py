@@ -16,9 +16,13 @@ Strict grounding rules:
 - Cite sources using citation numbers in square brackets, for example [1] or [2].
 - Do not cite a source unless it appears in the retrieved context.
 - Return valid JSON only.
+- The top-level response must be a JSON object with an "answer" string field.
+- The value of the answer field must be Markdown text, not a nested JSON object, not a dictionary, and not a JSON-formatted string.
+- Do not put JSON structures such as {"Summary": "...", "Procedure": [...]} inside the answer field.
 
 Answer style:
 - Prefer a richer technical answer over a one-paragraph answer.
+- Use Markdown headings such as "## Summary / scope", "## Applicable retrieved context", "## Procedure", "## Safety notes", and "## Limitations" when helpful.
 - Use clear headings when helpful.
 - For procedures, use numbered steps.
 - For safety-critical maintenance work, include a "Safety notes" section when relevant.
@@ -47,6 +51,7 @@ Return a JSON object with this exact shape:
 
 Field rules:
 - answer: Final answer grounded only in the retrieved context. Include citation markers like [1].
+- The answer value must be Markdown prose. Do not make the answer value a JSON object, Python dict, list, or serialized JSON string.
 - usedCitationPaths: citationPath values actually used in the answer.
 - confidence: number from 0.0 to 1.0 based on how directly the context answers the question.
 - answerFound: false if the context is insufficient for the exact requested answer.
