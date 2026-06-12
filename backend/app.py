@@ -1045,6 +1045,7 @@ async def ask(request: ProductionAskRequest):
         "confidence": confidence,
         "citations": citations,
         "usedCitationPaths": used_citation_paths,
+        "imageReferences": graph_state.get("image_references", []),
         "safety": safety_summary,
         "latencyMs": timer["elapsedMs"],
     }
@@ -1168,6 +1169,7 @@ async def chat(request: ChatRequest):
         "detectedContext": detected_context,
         "citations": citations,
         "usedCitationPaths": used_citation_paths,
+        "imageReferences": graph_state.get("image_references", []),
         "safety": safety_summary,
         "memory": memory_summary,
         "latencyMs": timer["elapsedMs"],
