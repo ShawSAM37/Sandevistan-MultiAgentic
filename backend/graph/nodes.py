@@ -13,6 +13,7 @@ from backend.agents.query_understanding_agent import (
 from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.context.context_builder import build_context_from_documents
+from backend.formatting.answer_formatter import format_answer_text
 from backend.memory.factory import get_memory_repository
 from backend.memory.models import ActiveConversationContext, ChatMessage
 from backend.graph.state import (
@@ -939,6 +940,8 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
             "final_used_citation_paths",
             answer.get("usedCitationPaths", []),
         )
+
+    state["final_answer"] = format_answer_text(state.get("final_answer", ""))
 
     add_trace_step(
         state,
