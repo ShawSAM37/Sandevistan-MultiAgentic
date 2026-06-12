@@ -549,3 +549,13 @@ class ChatResponse(BaseModel):
     safety: ChatSafetySummary | None = None
     memory: ChatMemorySummary
     latencyMs: int
+
+
+class ClearChatMemoryRequest(BaseModel):
+    threadId: str = Field(min_length=1)
+
+
+class ClearChatMemoryResponse(BaseModel):
+    requestId: str
+    threadId: str
+    cleared: bool

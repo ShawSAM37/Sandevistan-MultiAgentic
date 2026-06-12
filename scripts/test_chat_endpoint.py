@@ -339,10 +339,36 @@ def test_optional_azure_table_memory_entity(
 
     assert_true(len(recent_turns_json) > 0, "recentTurnsJson should not be empty.")
     assert_true("DR410i" in recent_turns_json, "recentTurnsJson should include DR410i.")
+
     assert_true(
-        "DR410i" in active_context_json or "DR410i" in conversation_summary or "DR410i" in recent_turns_json,
-        "Memory entity should preserve DR410i in active context, summary, or recent turns.",
+        len(conversation_summary.strip()) > 0,
+        "conversationSummary should not be empty after chat memory save.",
     )
+
+    assert_true(
+        "DR410i" in conversation_summary or "baseMachine=DR410i" in conversation_summary,
+        "conversationSummary should preserve DR410i/baseMachine context.",
+    )
+
+    assert_true(
+        len(active_context_json.strip()) > 0,
+        "activeContextJson should not be empty.",
+    )
+
+    assert_true(
+        "DR410i" in active_context_json,
+        "activeContextJson should preserve DR410i.",
+    )
+
+    assert_true(
+        "hydraulic tank breather filter" in active_context_json
+        or "hydraulic tank breather filter" in conversation_summary
+        or "hydraulic tank breather filter" in recent_turns_json,
+        "Persistent memory should preserve hydraulic tank breather filter context.",
+    )
+
+    print("conversationSummary preview:")
+    print(conversation_summary[:500])
 
     print("PASS: test_optional_azure_table_memory_entity")
 

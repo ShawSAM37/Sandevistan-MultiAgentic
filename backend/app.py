@@ -6,10 +6,13 @@ from backend.agents.input_guardrail_agent import run_input_guardrail_agent
 from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.config import settings
+from backend.memory.factory import get_memory_repository
 from backend.constants import APPROVED_INDEX_FIELDS, AZURE_SEARCH_INDEX_NAME
 from backend.context.context_builder import build_context_from_documents
 from backend.models import (
     ChatRequest,
+    ClearChatMemoryRequest,
+    ClearChatMemoryResponse,
     ChatResponse,
     DebugAnswerRequest,
     DebugContextRequest,
@@ -1192,3 +1195,29 @@ async def chat(request: ChatRequest):
     )
 
     return response
+
+
+@app.post("/chat/memory/clear", response_model=ClearChatMemoryResponse)
+async def clear_chat_memory(request: ClearChatMemoryRequest):
+    request_id = new_request_id()
+
+    log_event(
+        event="chat_memory_clear_requested",
+        request_id=request_id,
+        threadId=request.threadId,
+    )
+
+    repo = get_memory_repository()
+    repo.clear_memory(request.threadId)
+
+    log_event(
+        event="chat_memory_cleared",
+        request_id=request_id,
+        threadId=request.threadId,
+    )
+
+    return {
+        "requestId": request_id,
+        "threadId": request.threadId,
+        "cleared": True,
+    }
