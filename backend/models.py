@@ -147,7 +147,6 @@ class AskResponse(BaseModel):
     requestId: str
     answer: str
     citations: list[Citation] = []
-    imageReferences: list[ImageReference] = Field(default_factory=list)
     retrievedDocuments: list[RetrievedDocument] = []
 
     intent: str | None = None
@@ -442,7 +441,6 @@ class ProductionAskResponse(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     citations: list[dict] = Field(default_factory=list)
     usedCitationPaths: list[str] = Field(default_factory=list)
-    imageReferences: list[ImageReference] = Field(default_factory=list)
     safety: ProductionSafetySummary | None = None
     latencyMs: int
 
@@ -490,27 +488,6 @@ class QueryUnderstandingAgentResult(BaseModel):
         if invalid_fields:
             raise ValueError(f"Unsupported filter fields for V1: {sorted(invalid_fields)}")
         return self
-
-
-
-
-class ImageReference(BaseModel):
-    imageId: str
-    fileName: str
-    rawReference: str | None = None
-
-    citationId: int | None = None
-    citationPath: str | None = None
-
-    title: str | None = None
-    machine: str | None = None
-    baseMachine: str | None = None
-    serialNumber: str | None = None
-    manualType: str | None = None
-
-    usedInAnswer: bool = False
-    source: str = "used_citation"
-
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1)
@@ -569,7 +546,6 @@ class ChatResponse(BaseModel):
     detectedContext: ChatDetectedContext
     citations: list[dict] = Field(default_factory=list)
     usedCitationPaths: list[str] = Field(default_factory=list)
-    imageReferences: list[ImageReference] = Field(default_factory=list)
     safety: ChatSafetySummary | None = None
     memory: ChatMemorySummary
     latencyMs: int
