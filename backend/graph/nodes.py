@@ -13,10 +13,6 @@ from backend.agents.query_understanding_agent import (
 from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.context.context_builder import build_context_from_documents
-from backend.context.image_reference_extractor import (
-    extract_image_references_from_documents,
-    filter_image_references_for_used_citations,
-)
 from backend.formatting.answer_formatter import format_answer_text
 from backend.memory.factory import get_memory_repository
 from backend.memory.models import ActiveConversationContext, ChatMessage
@@ -512,8 +508,6 @@ def context_builder_node(state: RagGraphState) -> RagGraphState:
         state["context"] = ""
         state["context_char_count"] = 0
         state["citations"] = []
-        state["candidate_image_references"] = []
-        state["image_references"] = []
         state["used_documents"] = []
         state["skipped_documents"] = []
         return state
@@ -534,10 +528,6 @@ def context_builder_node(state: RagGraphState) -> RagGraphState:
             state["citations"] = result["citations"]
             state["used_documents"] = result["usedDocuments"]
             state["skipped_documents"] = result["skippedDocuments"]
-            state["candidate_image_references"] = extract_image_references_from_documents(
-                documents=result["usedDocuments"],
-                citations=result["citations"],
-            )
 
             add_trace_step(
                 state,
@@ -551,7 +541,6 @@ def context_builder_node(state: RagGraphState) -> RagGraphState:
                     "contextCharCount": result["contextCharCount"],
                     "usedDocumentCount": result["usedDocumentCount"],
                     "citationCount": len(result["citations"]),
-                    "candidateImageReferenceCount": len(state.get("candidate_image_references", [])),
                 },
             )
 
@@ -953,10 +942,6 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
         )
 
     state["final_answer"] = format_answer_text(state.get("final_answer", ""))
-    state["image_references"] = filter_image_references_for_used_citations(
-        candidate_image_references=state.get("candidate_image_references", []),
-        used_citation_paths=state.get("final_used_citation_paths", []),
-    )
 
     add_trace_step(
         state,
@@ -968,7 +953,6 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
             "hasGrounding": state.get("grounding") is not None,
             "hasRevision": state.get("revision") is not None,
             "hasSafety": state.get("safety") is not None,
-            "imageReferenceCount": len(state.get("image_references", [])),
         },
     )
 
