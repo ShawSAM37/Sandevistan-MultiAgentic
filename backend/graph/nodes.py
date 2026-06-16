@@ -17,6 +17,7 @@ from backend.context.image_reference_extractor import (
     extract_image_references_from_documents,
     filter_image_references_for_used_citations,
 )
+from backend.context.image_reference_resolver import resolve_image_references
 from backend.formatting.answer_formatter import format_answer_text
 from backend.memory.factory import get_memory_repository
 from backend.memory.models import ActiveConversationContext, ChatMessage
@@ -991,8 +992,10 @@ def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
             used_citation_paths=state.get("final_used_citation_paths", []),
         )
 
+        resolved_image_references = resolve_image_references(image_references)
+
         state["candidate_image_references"] = candidate_image_references
-        state["image_references"] = image_references
+        state["image_references"] = resolved_image_references
         state["image_reference_errors"] = state.get("image_reference_errors", [])
 
     except Exception as exc:

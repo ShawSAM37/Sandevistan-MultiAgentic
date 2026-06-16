@@ -53,3 +53,6 @@ backend/evals/results/
 data/raw/
 data/processed/
 *.csv
+image-manifest.jsonl
+image-manifest-summary.json
+image-manifest-duplicates.json
