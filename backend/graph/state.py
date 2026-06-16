@@ -162,6 +162,9 @@ def create_initial_graph_state(
         "final_confidence": 0.0,
         "final_used_citation_paths": [],
         "answer_found": False,
+        "candidate_image_references": [],
+        "image_references": [],
+        "image_reference_errors": [],
         "budgets": {
             "maxLlmCalls": max_llm_calls,
             "llmCallsUsed": 0,
