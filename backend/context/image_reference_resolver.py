@@ -20,7 +20,10 @@ def _lower(value: Any) -> str:
 
 
 def _tokens(value: Any) -> set[str]:
-    return {match.group(0).lower() for match in _WORD_PATTERN.finditer(_clean(value))}
+    return {
+        match.group(0).lower()
+        for match in _WORD_PATTERN.finditer(_clean(value))
+    }
 
 
 def _machine_hint(reference: dict[str, Any]) -> str:
@@ -40,7 +43,6 @@ def _score_manifest_match(
     reference: dict[str, Any],
     manifest_row: dict[str, Any],
 ) -> tuple[float, list[str]]:
-    """Score how well a manifest row matches a cited image reference."""
     score = 0.0
     reasons: list[str] = []
 
@@ -67,13 +69,11 @@ def _score_manifest_match(
 
     citation_path = _lower(reference.get("citationPath"))
     manual_title = _lower(manifest_row.get("manualTitle"))
-    manual_folder = _lower(manifest_row.get("manualFolder"))
 
     if manual_title and manual_title in citation_path:
         score += 0.10
         reasons.append("manifest manual title appeared in citationPath")
 
-    # Token overlap is weak but useful when citation paths and manual folders differ slightly.
     citation_tokens = _tokens(reference.get("citationPath")) | _tokens(reference.get("title"))
     manifest_tokens = _tokens(manifest_row.get("manualTitle")) | _tokens(manifest_row.get("manualFolder"))
     overlap = citation_tokens & manifest_tokens
@@ -129,10 +129,9 @@ def _resolve_one_image_reference(reference: dict[str, Any]) -> dict[str, Any]:
     resolved["manifestManualTitle"] = best_row.get("manualTitle")
     resolved["manifestLanguage"] = best_row.get("language")
     resolved["manifestCandidateCount"] = len(candidates)
-    resolved["manifestBestScore"] = best_score
+    resolved["manifestBestScore"] = round(best_score, 3)
     resolved["manifestAmbiguous"] = ambiguous
 
-    # Base relevance starts with citation-used image.
     relevance_score = 0.50 if reference.get("usedInAnswer") else 0.0
     relevance_score += min(best_score * 0.50, 0.50)
 
@@ -160,8 +159,10 @@ def _resolve_one_image_reference(reference: dict[str, Any]) -> dict[str, Any]:
     )
 
     resolution_reason = list(best_reasons)
+
     if ambiguous:
         resolution_reason.append("ambiguous manifest match: top candidates scored too closely")
+
     if not resolved["displayEligible"]:
         resolution_reason.append("not display eligible under current threshold")
 
@@ -173,11 +174,6 @@ def _resolve_one_image_reference(reference: dict[str, Any]) -> dict[str, Any]:
 def resolve_image_references(
     image_references: list[dict[str, Any]] | None,
 ) -> list[dict[str, Any]]:
-    """Resolve cited image references against the image manifest.
-
-    This function is deterministic and fail-soft at caller level.
-    It does not access Blob Storage files; it only resolves metadata.
-    """
     if not image_references:
         return []
 

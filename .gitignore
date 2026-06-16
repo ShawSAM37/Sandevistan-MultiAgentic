@@ -56,3 +56,6 @@ data/processed/
 image-manifest.jsonl
 image-manifest-summary.json
 image-manifest-duplicates.json
+image-manifest.jsonl
+image-manifest-summary.json
+image-manifest-duplicates.json
