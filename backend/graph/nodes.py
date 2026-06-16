@@ -13,6 +13,10 @@ from backend.agents.query_understanding_agent import (
 from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.context.context_builder import build_context_from_documents
+from backend.context.image_reference_extractor import (
+    extract_image_references_from_documents,
+    filter_image_references_for_used_citations,
+)
 from backend.formatting.answer_formatter import format_answer_text
 from backend.memory.factory import get_memory_repository
 from backend.memory.models import ActiveConversationContext, ChatMessage
@@ -956,12 +960,56 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
         },
     )
 
+    state = _attach_debug_image_references(state)
     return state
 
 
 
 
 
+
+
+def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
+    """Attach image references as debug-only derived metadata.
+
+    This is intentionally fail-soft:
+    - it must never block answering
+    - it must never affect safety/grounding/revision
+    - it must never require public API schema changes
+
+    Candidate refs are extracted from context documents.
+    Final refs are filtered to final_used_citation_paths only.
+    """
+    try:
+        candidate_image_references = extract_image_references_from_documents(
+            documents=state.get("used_documents", []),
+            citations=state.get("citations", []),
+        )
+
+        image_references = filter_image_references_for_used_citations(
+            candidate_image_references=candidate_image_references,
+            used_citation_paths=state.get("final_used_citation_paths", []),
+        )
+
+        state["candidate_image_references"] = candidate_image_references
+        state["image_references"] = image_references
+        state["image_reference_errors"] = state.get("image_reference_errors", [])
+
+    except Exception as exc:
+        errors = list(state.get("image_reference_errors", []))
+        errors.append(
+            {
+                "stage": "final_response_debug_image_references",
+                "message": str(exc),
+                "recoverable": True,
+            }
+        )
+
+        state["candidate_image_references"] = []
+        state["image_references"] = []
+        state["image_reference_errors"] = errors
+
+    return state
 
 def _updated_active_context_from_state(
     current_context: ActiveConversationContext,
