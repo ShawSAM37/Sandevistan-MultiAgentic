@@ -75,12 +75,16 @@ def _score_manifest_match(
         reasons.append("manifest manual title appeared in citationPath")
 
     citation_tokens = _tokens(reference.get("citationPath")) | _tokens(reference.get("title"))
-    manifest_tokens = _tokens(manifest_row.get("manualTitle")) | _tokens(manifest_row.get("manualFolder"))
+    manifest_tokens = _tokens(manifest_row.get("manualTitle")) | _tokens(
+        manifest_row.get("manualFolder")
+    )
     overlap = citation_tokens & manifest_tokens
 
     if overlap:
         score += min(0.08, len(overlap) * 0.01)
-        reasons.append(f"citation/manual token overlap: {', '.join(sorted(list(overlap))[:6])}")
+        reasons.append(
+            f"citation/manual token overlap: {', '.join(sorted(list(overlap))[:6])}"
+        )
 
     return min(score, 1.0), reasons
 
