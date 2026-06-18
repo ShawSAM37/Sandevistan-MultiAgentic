@@ -14,8 +14,11 @@ from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.context.context_builder import build_context_from_documents
 from backend.context.image_reranker import rerank_image_references
-from backend.context.image_reference_extractor import extract_image_references_from_documents, extract_image_references_from_context_text, filter_image_references_for_used_citations
 from backend.context.image_reference_extractor import (
+    extract_image_references_from_documents,
+    extract_image_references_from_context_text,
+    extract_image_references_from_single_context_for_citation,
+    filter_image_references_for_used_citations,
     extract_image_references_from_documents,
     filter_image_references_for_used_citations,
 )
@@ -990,11 +993,68 @@ def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
             citations=state.get("citations", []),
         )
 
+        context_text = state.get("context", "") or ""
+        context_png_matches = []
+        try:
+            import re
+            context_png_matches = sorted(
+                set(
+                    re.findall(
+                        r"GUID-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*-low\\.png",
+                        str(context_text),
+                        flags=re.IGNORECASE,
+                    )
+                )
+            )
+        except Exception:
+            context_png_matches = []
+
+        image_reference_debug = {
+            "usedDocumentCount": len(state.get("used_documents", []) or []),
+            "usedDocumentContentLengths": [
+                len(str(document.get("content") or ""))
+                for document in (state.get("used_documents", []) or [])
+                if isinstance(document, dict)
+            ],
+            "contextCharCount": len(str(context_text)),
+            "contextContainsPng": ".png" in str(context_text).lower(),
+            "contextPngMatches": context_png_matches[:20],
+            "contextPngMatchCount": len(context_png_matches),
+            "extractionSource": "used_documents",
+        }
+
         if not candidate_image_references:
             candidate_image_references = extract_image_references_from_context_text(
-                context=state.get("context", ""),
+                context=context_text,
                 citations=state.get("citations", []),
             )
+            if candidate_image_references:
+                image_reference_debug["extractionSource"] = "context_by_citation_paths"
+
+        if not candidate_image_references:
+            final_used_paths = state.get("final_used_citation_paths", []) or []
+            citations = state.get("citations", []) or []
+
+            if len(final_used_paths) == 1:
+                final_path = str(final_used_paths[0])
+                final_citation = next(
+                    (
+                        citation
+                        for citation in citations
+                        if str(citation.get("citationPath")) == final_path
+                    ),
+                    None,
+                )
+
+                if final_citation:
+                    candidate_image_references = extract_image_references_from_single_context_for_citation(
+                        context=context_text,
+                        citation=final_citation,
+                    )
+                    if candidate_image_references:
+                        image_reference_debug["extractionSource"] = "whole_context_single_final_citation"
+
+        state["image_reference_debug"] = image_reference_debug
 
         used_citation_image_references = filter_image_references_for_used_citations(
             candidate_image_references=candidate_image_references,

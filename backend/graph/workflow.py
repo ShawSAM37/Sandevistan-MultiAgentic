@@ -163,6 +163,7 @@ def graph_state_to_debug_response(state: RagGraphState) -> dict[str, Any]:
         "candidateImageReferences": state.get("candidate_image_references", []),
         "imageReferences": state.get("image_references", []),
         "imageReferenceErrors": state.get("image_reference_errors", []),
+        "imageReferenceDebug": state.get("image_reference_debug", {}),
         "retrieval": None,
         "contextCharCount": state.get("context_char_count", 0),
         "usedDocumentCount": len(state.get("used_documents", [])),

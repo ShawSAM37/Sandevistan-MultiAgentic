@@ -307,3 +307,32 @@ def extract_image_references_from_context_text(
         )
 
     return []
+
+def extract_image_references_from_single_context_for_citation(
+    context: str | None,
+    citation: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Extract PNG image references from full context and attach them to one citation.
+
+    This is a conservative fallback for cases where:
+    - used_documents are metadata-only / content-empty
+    - final answer used exactly one citation
+    - graph context may still contain markdown image refs
+    """
+    if not context:
+        return []
+
+    synthetic_doc = {
+        "content": str(context),
+        "title": citation.get("title"),
+        "citationPath": citation.get("citationPath"),
+        "machine": citation.get("machine"),
+        "baseMachine": citation.get("baseMachine"),
+        "serialNumber": citation.get("serialNumber"),
+        "manualType": citation.get("manualType"),
+    }
+
+    return extract_image_references_from_documents(
+        documents=[synthetic_doc],
+        citations=[citation],
+    )
