@@ -220,3 +220,90 @@ def filter_image_references_for_used_citations(
         results.append(filtered_reference)
 
     return results
+
+def extract_image_references_from_context_text(
+    context: str | None,
+    citations: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Extract PNG image references from the rendered graph context.
+
+    This is a fallback for cases where used_documents are metadata-only
+    but the full context string sent to the answer model still contains
+    markdown image refs such as:
+        ![](GUID-...-low.png)
+
+    It attempts to associate images with citation paths by locating each
+    citationPath inside the context text and scanning that citation block.
+    """
+    if not context:
+        return []
+
+    context_text = str(context)
+    citations = citations or []
+
+    if not citations:
+        synthetic_doc = {
+            "content": context_text,
+            "citationPath": None,
+            "title": None,
+        }
+        return extract_image_references_from_documents([synthetic_doc], [])
+
+    # Find citation path positions in the context.
+    positioned: list[tuple[int, dict[str, Any]]] = []
+
+    for citation in citations:
+        citation_path = citation.get("citationPath")
+        if not citation_path:
+            continue
+
+        position = context_text.find(str(citation_path))
+        if position >= 0:
+            positioned.append((position, citation))
+
+    positioned.sort(key=lambda item: item[0])
+
+    synthetic_documents: list[dict[str, Any]] = []
+
+    if positioned:
+        for index, (start, citation) in enumerate(positioned):
+            end = positioned[index + 1][0] if index + 1 < len(positioned) else len(context_text)
+            section_text = context_text[start:end]
+
+            synthetic_documents.append(
+                {
+                    "content": section_text,
+                    "title": citation.get("title"),
+                    "citationPath": citation.get("citationPath"),
+                    "machine": citation.get("machine"),
+                    "baseMachine": citation.get("baseMachine"),
+                    "serialNumber": citation.get("serialNumber"),
+                    "manualType": citation.get("manualType"),
+                }
+            )
+
+        return extract_image_references_from_documents(
+            synthetic_documents,
+            citations,
+        )
+
+    # If citation paths are not present in context, use a conservative fallback:
+    # only attach all context images when there is exactly one citation.
+    if len(citations) == 1:
+        citation = citations[0]
+        synthetic_doc = {
+            "content": context_text,
+            "title": citation.get("title"),
+            "citationPath": citation.get("citationPath"),
+            "machine": citation.get("machine"),
+            "baseMachine": citation.get("baseMachine"),
+            "serialNumber": citation.get("serialNumber"),
+            "manualType": citation.get("manualType"),
+        }
+
+        return extract_image_references_from_documents(
+            [synthetic_doc],
+            citations,
+        )
+
+    return []

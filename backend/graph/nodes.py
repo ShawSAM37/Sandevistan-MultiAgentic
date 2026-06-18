@@ -13,6 +13,8 @@ from backend.agents.query_understanding_agent import (
 from backend.agents.revision_agent import revise_answer
 from backend.agents.safety_critic_agent import evaluate_safety
 from backend.context.context_builder import build_context_from_documents
+from backend.context.image_reranker import rerank_image_references
+from backend.context.image_reference_extractor import extract_image_references_from_documents, extract_image_references_from_context_text, filter_image_references_for_used_citations
 from backend.context.image_reference_extractor import (
     extract_image_references_from_documents,
     filter_image_references_for_used_citations,
@@ -971,15 +973,16 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
 
 
 def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
-    """Attach image references as debug-only derived metadata.
+    """Debug-only simple image pipeline.
 
-    This is intentionally fail-soft:
-    - it must never block answering
-    - it must never affect safety/grounding/revision
-    - it must never require public API schema changes
+    Pipeline:
+    1. Extract .png image filenames from used chunk text.
+    2. Keep only images from final-used citation paths.
+    3. Resolve filenames through image-manifest.jsonl.
+    4. Rerank against question + final answer.
+    5. Store all candidates plus display-eligible final image refs.
 
-    Candidate refs are extracted from context documents.
-    Final refs are filtered to final_used_citation_paths only.
+    This must never block the answer.
     """
     try:
         candidate_image_references = extract_image_references_from_documents(
@@ -987,22 +990,42 @@ def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
             citations=state.get("citations", []),
         )
 
-        image_references = filter_image_references_for_used_citations(
+        if not candidate_image_references:
+            candidate_image_references = extract_image_references_from_context_text(
+                context=state.get("context", ""),
+                citations=state.get("citations", []),
+            )
+
+        used_citation_image_references = filter_image_references_for_used_citations(
             candidate_image_references=candidate_image_references,
             used_citation_paths=state.get("final_used_citation_paths", []),
         )
 
-        resolved_image_references = resolve_image_references(image_references)
+        resolved_image_references = resolve_image_references(
+            used_citation_image_references
+        )
 
-        state["candidate_image_references"] = candidate_image_references
-        state["image_references"] = resolved_image_references
+        reranked_image_references = rerank_image_references(
+            question=state.get("current_question", "") or state.get("sanitized_question", ""),
+            final_answer=state.get("final_answer", ""),
+            image_references=resolved_image_references,
+        )
+
+        display_image_references = [
+            reference
+            for reference in reranked_image_references
+            if reference.get("displayEligible")
+        ][:3]
+
+        state["candidate_image_references"] = reranked_image_references
+        state["image_references"] = display_image_references
         state["image_reference_errors"] = state.get("image_reference_errors", [])
 
     except Exception as exc:
         errors = list(state.get("image_reference_errors", []))
         errors.append(
             {
-                "stage": "final_response_debug_image_references",
+                "stage": "simple_image_pipeline",
                 "message": str(exc),
                 "recoverable": True,
             }
