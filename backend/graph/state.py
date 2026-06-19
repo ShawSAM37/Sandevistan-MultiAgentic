@@ -92,6 +92,10 @@ class RagGraphState(TypedDict, total=False):
     final_answer: str
     final_confidence: float
     final_used_citation_paths: list[str]
+    candidate_image_references: list[dict[str, Any]]
+    image_references: list[dict[str, Any]]
+    image_reference_errors: list[dict[str, Any]]
+    image_reference_debug: dict[str, Any]
     answer_found: bool
 
     # Control / budgets
@@ -165,6 +169,10 @@ def create_initial_graph_state(
         "candidate_image_references": [],
         "image_references": [],
         "image_reference_errors": [],
+        "image_reference_debug": {
+            "imagePipelineBuild": "phase52-state-context-fallback",
+            "imageAgentRan": False,
+        },
         "budgets": {
             "maxLlmCalls": max_llm_calls,
             "llmCallsUsed": 0,
