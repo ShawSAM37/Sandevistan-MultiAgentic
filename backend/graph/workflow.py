@@ -99,6 +99,8 @@ def run_rag_graph(
         max_recent_turns=max_recent_turns,
         conversation_summary_max_chars=conversation_summary_max_chars,
     )
+    initial_state["enable_image_references"] = enable_image_references
+    
 
     # Debug-only image retrieval gate.
     # Public /ask and /chat should keep this False by default.
