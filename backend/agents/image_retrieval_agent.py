@@ -15,11 +15,7 @@ def extract_candidate_images_from_chunks(
     documents: list[dict[str, Any]] | None,
     citations: list[dict[str, Any]] | None,
 ) -> list[dict[str, Any]]:
-    """Extract PNG image candidates from raw retrieved/context documents.
-
-    This function should run as close as possible to retrieval/context-building,
-    before document content is stripped from debug/API responses.
-    """
+    """Extract PNG image candidates from raw retrieved/context documents."""
     return extract_image_references_from_documents(
         documents=documents or [],
         citations=citations or [],
@@ -34,13 +30,7 @@ def retrieve_relevant_images_for_final_answer(
     final_used_citation_paths: list[str] | None,
     max_images: int = 3,
 ) -> dict[str, Any]:
-    """Filter, resolve, and rerank image candidates for the final answer.
-
-    Safety rules:
-    - Only images from final-used citation paths can become final image references.
-    - The model/agent never invents filenames.
-    - Resolved/reranked images are selected only from deterministic candidates.
-    """
+    """Filter, resolve, and rerank image candidates for the final answer."""
     debug: dict[str, Any] = {
         "candidateImageCountBeforeFilter": len(candidate_image_references or []),
         "finalUsedCitationPathCount": len(final_used_citation_paths or []),

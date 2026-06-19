@@ -1046,127 +1046,45 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
 
 
 def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
-    """Debug-only simple image pipeline.
+    """Finalize debug image references using candidates extracted at context-build time.
 
-    Pipeline:
-    1. Extract .png image filenames from used chunk text.
-    2. Keep only images from final-used citation paths.
-    3. Resolve filenames through image-manifest.jsonl.
-    4. Rerank against question + final answer.
-    5. Store all candidates plus display-eligible final image refs.
-
-    This must never block the answer.
+    Image pipeline:
+    - context_builder_node extracts PNG candidates from raw retrieved chunks.
+    - final_response_node knows final_used_citation_paths.
+    - this helper filters candidates to final-used citations, resolves them via manifest,
+      reranks them against the final answer, and stores final display-eligible refs.
     """
     try:
-        candidate_image_references = extract_image_references_from_documents(
-            documents=state.get("used_documents", []),
-            citations=state.get("citations", []),
-        )
-
-        context_text = state.get("context", "") or ""
-        context_png_matches = []
-        try:
-            import re
-            context_png_matches = sorted(
-                set(
-                    re.findall(
-                        r"GUID-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*-low\\.png",
-                        str(context_text),
-                        flags=re.IGNORECASE,
-                    )
-                )
-            )
-        except Exception:
-            context_png_matches = []
-
-        image_reference_debug = {
-            "usedDocumentCount": len(state.get("used_documents", []) or []),
-            "usedDocumentContentLengths": [
-                len(str(document.get("content") or ""))
-                for document in (state.get("used_documents", []) or [])
-                if isinstance(document, dict)
-            ],
-            "contextCharCount": len(str(context_text)),
-            "contextContainsPng": ".png" in str(context_text).lower(),
-            "contextPngMatches": context_png_matches[:20],
-            "contextPngMatchCount": len(context_png_matches),
-            "extractionSource": "used_documents",
-        }
-
-        if not candidate_image_references:
-            candidate_image_references = extract_image_references_from_context_text(
-                context=context_text,
-                citations=state.get("citations", []),
-            )
-            if candidate_image_references:
-                image_reference_debug["extractionSource"] = "context_by_citation_paths"
-
-        if not candidate_image_references:
-            final_used_paths = state.get("final_used_citation_paths", []) or []
-            citations = state.get("citations", []) or []
-
-            if len(final_used_paths) == 1:
-                final_path = str(final_used_paths[0])
-                final_citation = next(
-                    (
-                        citation
-                        for citation in citations
-                        if str(citation.get("citationPath")) == final_path
-                    ),
-                    None,
-                )
-
-                if final_citation:
-                    candidate_image_references = extract_image_references_from_single_context_for_citation(
-                        context=context_text,
-                        citation=final_citation,
-                    )
-                    if candidate_image_references:
-                        image_reference_debug["extractionSource"] = "whole_context_single_final_citation"
-
-        state["image_reference_debug"] = image_reference_debug
-
-        used_citation_image_references = filter_image_references_for_used_citations(
-            candidate_image_references=candidate_image_references,
-            used_citation_paths=state.get("final_used_citation_paths", []),
-        )
-
-        resolved_image_references = resolve_image_references(
-            used_citation_image_references
-        )
-
-        reranked_image_references = rerank_image_references(
+        image_result = retrieve_relevant_images_for_final_answer(
             question=state.get("current_question", "") or state.get("sanitized_question", ""),
             final_answer=state.get("final_answer", ""),
-            image_references=resolved_image_references,
+            candidate_image_references=state.get("candidate_image_references", []),
+            final_used_citation_paths=state.get("final_used_citation_paths", []),
+            max_images=3,
         )
-    
-        display_image_references = [
-            reference
-            for reference in reranked_image_references
-            if reference.get("displayEligible")
-        ][:3]
 
-        state["candidate_image_references"] = reranked_image_references
-        state["image_references"] = display_image_references
-        state["image_reference_errors"] = state.get("image_reference_errors", [])
+        state["candidate_image_references"] = image_result.get("candidateImageReferences", [])
+        state["image_references"] = image_result.get("imageReferences", [])
+        state["image_reference_debug"] = image_result.get("imageReferenceDebug", {})
+        state["image_reference_errors"] = image_result.get("imageReferenceErrors", [])
 
     except Exception as exc:
         errors = list(state.get("image_reference_errors", []))
         errors.append(
             {
-                "stage": "simple_image_pipeline",
+                "stage": "final_response_image_retrieval_agent",
                 "message": str(exc),
                 "recoverable": True,
             }
         )
 
-        state["candidate_image_references"] = []
         state["image_references"] = []
+        state["image_reference_debug"] = {
+            "selectionMode": "failed",
+        }
         state["image_reference_errors"] = errors
 
     return state
-
 def _updated_active_context_from_state(
     current_context: ActiveConversationContext,
     state: RagGraphState,
