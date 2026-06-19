@@ -505,7 +505,94 @@ def retrieval_node(state: RagGraphState) -> RagGraphState:
             state["final_answer"] = "I could not retrieve relevant manual context for this question."
             state["final_confidence"] = 0.0
             state["final_used_citation_paths"] = []
-            return state
+
+    try:
+        retrieval_payload = state.get("retrieval", {}) or {}
+        retrieval_documents = (
+            retrieval_payload.get("documents")
+            or retrieval_payload.get("results")
+            or retrieval_payload.get("value")
+            or retrieval_payload.get("items")
+            or []
+        )
+
+        if not retrieval_documents:
+            retrieval_documents = state.get("used_documents", []) or []
+
+        first_document = retrieval_documents[0] if retrieval_documents else {}
+        first_content = str(first_document.get("content") or "") if isinstance(first_document, dict) else ""
+
+        retrieval_candidate_images = extract_candidate_images_from_chunks(
+            documents=retrieval_documents,
+            citations=state.get("citations", []),
+        )
+
+        state["candidate_image_references"] = retrieval_candidate_images
+
+        image_debug = dict(state.get("image_reference_debug", {}) or {})
+        image_debug.update(
+            {
+                "imagePipelineBuild": "phase51-image-agent-trace",
+                "imageAgentRan": True,
+                "retrievalExtractionRan": True,
+                "retrievalDocumentCountForImageExtraction": len(retrieval_documents or []),
+                "retrievalCandidateImageCount": len(retrieval_candidate_images or []),
+                "retrievalFirstDocumentKeys": sorted(list(first_document.keys())) if isinstance(first_document, dict) else [],
+                "retrievalFirstContentLength": len(first_content),
+                "retrievalFirstContainsPng": ".png" in first_content.lower(),
+                "retrievalFirstContainsGuid": "GUID-" in first_content,
+                "retrievalFirstTitle": first_document.get("title") if isinstance(first_document, dict) else None,
+                "retrievalFirstCitationPath": first_document.get("citationPath") if isinstance(first_document, dict) else None,
+            }
+        )
+        state["image_reference_debug"] = image_debug
+
+        state = add_trace_step(
+            state,
+            node="image_retrieval_agent",
+            event="retrieval_candidate_extraction_completed",
+            output_summary={
+                "imagePipelineBuild": "phase51-image-agent-trace",
+                "retrievalDocumentCount": len(retrieval_documents or []),
+                "firstDocumentContentLength": len(first_content),
+                "firstDocumentContainsPng": ".png" in first_content.lower(),
+                "firstDocumentContainsGuid": "GUID-" in first_content,
+                "candidateImageCount": len(retrieval_candidate_images or []),
+            },
+        )
+
+    except Exception as exc:
+        errors = list(state.get("image_reference_errors", []))
+        errors.append(
+            {
+                "stage": "retrieval_node_image_candidate_extraction",
+                "message": str(exc),
+                "recoverable": True,
+            }
+        )
+        state["image_reference_errors"] = errors
+
+        image_debug = dict(state.get("image_reference_debug", {}) or {})
+        image_debug.update(
+            {
+                "imagePipelineBuild": "phase51-image-agent-trace",
+                "imageAgentRan": False,
+                "retrievalExtractionRan": False,
+                "retrievalExtractionError": str(exc),
+            }
+        )
+        state["image_reference_debug"] = image_debug
+
+        state = add_trace_step(
+            state,
+            node="image_retrieval_agent",
+            event="retrieval_candidate_extraction_failed",
+            error=str(exc),
+            output_summary={
+                "imagePipelineBuild": "phase51-image-agent-trace",
+            },
+        )
+    return state
 
 
 def context_builder_node(state: RagGraphState) -> RagGraphState:
@@ -1046,14 +1133,7 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
 
 
 def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
-    """Finalize debug image references using candidates extracted at context-build time.
-
-    Image pipeline:
-    - context_builder_node extracts PNG candidates from raw retrieved chunks.
-    - final_response_node knows final_used_citation_paths.
-    - this helper filters candidates to final-used citations, resolves them via manifest,
-      reranks them against the final answer, and stores final display-eligible refs.
-    """
+    """Finalize image refs from retrieval-time candidates and emit trace diagnostics."""
     try:
         image_result = retrieve_relevant_images_for_final_answer(
             question=state.get("current_question", "") or state.get("sanitized_question", ""),
@@ -1063,13 +1143,42 @@ def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
             max_images=3,
         )
 
+        incoming_debug = dict(state.get("image_reference_debug", {}) or {})
+        selection_debug = dict(image_result.get("imageReferenceDebug", {}) or {})
+        merged_debug = {
+            **incoming_debug,
+            **selection_debug,
+            "imagePipelineBuild": "phase51-image-agent-trace",
+            "finalSelectionRan": True,
+            "finalSelectionStage": "final_response_node",
+        }
+
         state["candidate_image_references"] = image_result.get("candidateImageReferences", [])
         state["image_references"] = image_result.get("imageReferences", [])
-        state["image_reference_debug"] = image_result.get("imageReferenceDebug", {})
-        state["image_reference_errors"] = image_result.get("imageReferenceErrors", [])
+        state["image_reference_debug"] = merged_debug
+
+        existing_errors = list(state.get("image_reference_errors", []) or [])
+        state["image_reference_errors"] = existing_errors + list(
+            image_result.get("imageReferenceErrors", []) or []
+        )
+
+        state = add_trace_step(
+            state,
+            node="image_retrieval_agent",
+            event="final_image_selection_completed",
+            output_summary={
+                "imagePipelineBuild": "phase51-image-agent-trace",
+                "candidateImageCountBeforeFilter": merged_debug.get("candidateImageCountBeforeFilter", 0),
+                "finalUsedCitationPathCount": merged_debug.get("finalUsedCitationPathCount", 0),
+                "usedCitationImageCount": merged_debug.get("usedCitationImageCount", 0),
+                "resolvedImageCount": merged_debug.get("resolvedImageCount", 0),
+                "displayEligibleImageCount": merged_debug.get("displayEligibleImageCount", 0),
+                "selectedImageCount": merged_debug.get("selectedImageCount", 0),
+            },
+        )
 
     except Exception as exc:
-        errors = list(state.get("image_reference_errors", []))
+        errors = list(state.get("image_reference_errors", []) or [])
         errors.append(
             {
                 "stage": "final_response_image_retrieval_agent",
@@ -1077,12 +1186,29 @@ def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
                 "recoverable": True,
             }
         )
-
-        state["image_references"] = []
-        state["image_reference_debug"] = {
-            "selectionMode": "failed",
-        }
         state["image_reference_errors"] = errors
+
+        debug = dict(state.get("image_reference_debug", {}) or {})
+        debug.update(
+            {
+                "imagePipelineBuild": "phase51-image-agent-trace",
+                "finalSelectionRan": False,
+                "finalSelectionStage": "final_response_node_failed",
+                "finalSelectionError": str(exc),
+            }
+        )
+        state["image_reference_debug"] = debug
+        state["image_references"] = []
+
+        state = add_trace_step(
+            state,
+            node="image_retrieval_agent",
+            event="final_image_selection_failed",
+            error=str(exc),
+            output_summary={
+                "imagePipelineBuild": "phase51-image-agent-trace",
+            },
+        )
 
     return state
 def _updated_active_context_from_state(
