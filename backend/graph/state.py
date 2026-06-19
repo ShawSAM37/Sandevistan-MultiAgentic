@@ -166,6 +166,7 @@ def create_initial_graph_state(
         "final_confidence": 0.0,
         "final_used_citation_paths": [],
         "answer_found": False,
+        "enable_image_references": False,
         "candidate_image_references": [],
         "image_references": [],
         "image_reference_errors": [],

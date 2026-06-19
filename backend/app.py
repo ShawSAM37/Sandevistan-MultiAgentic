@@ -934,6 +934,7 @@ async def debug_graph_answer(request: DebugGraphAnswerRequest):
             filters=request.filters,
             top=request.top,
             k=request.k,
+            enable_image_references=True,
             use_semantic_ranker=request.useSemanticRanker,
             include_debug_context=request.includeDebugContext,
             max_context_chars=request.maxContextChars or settings.max_context_chars,

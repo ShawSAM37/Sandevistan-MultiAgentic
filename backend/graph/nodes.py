@@ -1133,6 +1133,20 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
 
 
 def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
+    if not state.get("enable_image_references", False):
+        debug = dict(state.get("image_reference_debug", {}) or {})
+        debug.update(
+            {
+                "imagePipelineBuild": "phase54-debug-only-image-gate",
+                "imageAgentSkipped": True,
+                "skipReason": "enable_image_references is false",
+            }
+        )
+        state["image_reference_debug"] = debug
+        state["candidate_image_references"] = []
+        state["image_references"] = []
+        return state
+
     """Finalize image refs from retrieval-time candidates and emit trace diagnostics."""
     try:
         image_result = retrieve_relevant_images_for_final_answer(

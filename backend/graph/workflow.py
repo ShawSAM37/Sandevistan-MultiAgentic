@@ -53,7 +53,6 @@ def build_rag_graph():
 
     return graph.compile()
 
-
 def run_rag_graph(
     *,
     request_id: str,
@@ -68,6 +67,7 @@ def run_rag_graph(
     use_semantic_ranker: bool = False,
     include_debug_context: bool = False,
     max_llm_calls: int = 6,
+    enable_image_references: bool = False,
     max_revision_count: int = 1,
     max_context_chars: int = 12000,
     max_chars_per_document: int = 2500,
@@ -100,6 +100,11 @@ def run_rag_graph(
         conversation_summary_max_chars=conversation_summary_max_chars,
     )
 
+    # Debug-only image retrieval gate.
+    # Public /ask and /chat should keep this False by default.
+    # /debug/graph-answer can pass True explicitly.
+    initial_state["enable_image_references"] = enable_image_references
+
     log_event(
         event="rag_graph_started",
         request_id=request_id,
@@ -110,6 +115,7 @@ def run_rag_graph(
         useSemanticRanker=use_semantic_ranker,
         maxLlmCalls=max_llm_calls,
         maxRevisionCount=max_revision_count,
+        enableImageReferences=enable_image_references,
     )
 
     graph = build_rag_graph()
@@ -133,6 +139,8 @@ def run_rag_graph(
         revisionCount=result.get("budgets", {}).get("revisionCount"),
         traceStepCount=len(result.get("trace_steps", [])),
         errorCount=len(result.get("errors", [])),
+        enableImageReferences=result.get("enable_image_references"),
+        imageReferenceCount=len(result.get("image_references", []) or []),
     )
 
     return result
