@@ -38,6 +38,12 @@ from backend.graph.state import (
 from backend.observability.timing import elapsed_timer
 from backend.retrieval.search_executor import execute_search
 
+from backend.agents.image_retrieval_agent import (
+    extract_candidate_images_from_chunks,
+    retrieve_relevant_images_for_final_answer,
+)
+
+
 
 def _request_id(state: RagGraphState) -> str | None:
     return state.get("request_id")
@@ -533,11 +539,40 @@ def context_builder_node(state: RagGraphState) -> RagGraphState:
                 request_id=request_id,
             )
 
+
+
+
+            try:
+                raw_image_documents = documents
+
+                candidate_image_references = extract_candidate_images_from_chunks(
+                    documents=raw_image_documents,
+                    citations=state.get("citations", []),
+                )
+
+                state["candidate_image_references"] = candidate_image_references
+
+            except Exception as exc:
+                errors = list(state.get("image_reference_errors", []))
+                errors.append(
+                    {
+                        "stage": "context_builder_image_candidate_extraction",
+                        "message": str(exc),
+                        "recoverable": True,
+                    }
+                )
+                state["candidate_image_references"] = []
+                state["image_reference_errors"] = errors
+
+
+
+
             state["context"] = result["context"]
             state["context_char_count"] = result["contextCharCount"]
             state["citations"] = result["citations"]
             state["used_documents"] = result["usedDocuments"]
             state["skipped_documents"] = result["skippedDocuments"]
+            
 
             add_trace_step(
                 state,
@@ -951,6 +986,41 @@ def final_response_node(state: RagGraphState) -> RagGraphState:
             answer.get("usedCitationPaths", []),
         )
 
+    try:
+        image_result = retrieve_relevant_images_for_final_answer(
+            question=state.get("current_question", "") or state.get("sanitized_question", ""),
+            final_answer=state.get("final_answer", ""),
+            candidate_image_references=state.get("candidate_image_references", []),
+            final_used_citation_paths=state.get("final_used_citation_paths", []),
+            max_images=3,
+        )
+
+        state["candidate_image_references"] = image_result.get("candidateImageReferences", [])
+        state["image_references"] = image_result.get("imageReferences", [])
+        state["image_reference_debug"] = image_result.get("imageReferenceDebug", {})
+        state["image_reference_errors"] = image_result.get("imageReferenceErrors", [])
+
+    except Exception as exc:
+        errors = list(state.get("image_reference_errors", []))
+        errors.append(
+            {
+                "stage": "final_response_image_retrieval_agent",
+                "message": str(exc),
+                "recoverable": True,
+            }
+        )
+        state["image_references"] = []
+        state["image_reference_debug"] = {
+            "selectionMode": "failed",
+        }
+        state["image_reference_errors"] = errors
+
+
+
+
+
+
+
     state["final_answer"] = format_answer_text(state.get("final_answer", ""))
 
     add_trace_step(
@@ -1070,7 +1140,7 @@ def _attach_debug_image_references(state: RagGraphState) -> RagGraphState:
             final_answer=state.get("final_answer", ""),
             image_references=resolved_image_references,
         )
-
+    
         display_image_references = [
             reference
             for reference in reranked_image_references
@@ -1311,6 +1381,8 @@ def save_memory_node(state: RagGraphState) -> RagGraphState:
             )
 
             return state
+        
+
 
 
 GRAPH_NODE_FUNCTIONS: dict[str, Any] = {
