@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import base64
 import json
 import os
 from functools import lru_cache
@@ -11,6 +12,7 @@ import requests
 
 MANIFEST_LOCAL_PATH_ENV = "SANDEVISTAN_IMAGE_MANIFEST_LOCAL_PATH"
 MANIFEST_URL_ENV = "SANDEVISTAN_IMAGE_MANIFEST_URL"
+MANIFEST_URL_B64_ENV = "SANDEVISTAN_IMAGE_MANIFEST_URL_B64"
 
 
 def _load_jsonl_text(text: str) -> list[dict[str, Any]]:
@@ -24,7 +26,7 @@ def _load_jsonl_text(text: str) -> list[dict[str, Any]]:
         try:
             row = json.loads(cleaned)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid JSONL manifest row at line {line_number}: {exc}") from exc
+            raise ValueError(f"Invalid image manifest JSONL row at line {line_number}: {exc}") from exc
 
         if isinstance(row, dict):
             rows.append(row)
@@ -49,22 +51,16 @@ def _load_manifest_from_url(url: str) -> list[dict[str, Any]]:
 
 @lru_cache(maxsize=1)
 def load_image_manifest() -> list[dict[str, Any]]:
-    """Load image manifest from local path or URL.
-
-    Resolution order:
-    1. SANDEVISTAN_IMAGE_MANIFEST_LOCAL_PATH
-    2. SANDEVISTAN_IMAGE_MANIFEST_URL
-    3. ./image-manifest.jsonl if present
-
-    This loader intentionally has no dependency on Azure SDKs.
-    For deployed debug testing, use a read-only SAS URL in
-    SANDEVISTAN_IMAGE_MANIFEST_URL.
-    """
     local_path = os.getenv(MANIFEST_LOCAL_PATH_ENV, "").strip()
+    manifest_url_b64 = os.getenv(MANIFEST_URL_B64_ENV, "").strip()
     manifest_url = os.getenv(MANIFEST_URL_ENV, "").strip()
 
     if local_path:
         return _load_manifest_from_local_path(local_path)
+
+    if manifest_url_b64:
+        decoded_url = base64.b64decode(manifest_url_b64).decode("utf-8")
+        return _load_manifest_from_url(decoded_url)
 
     if manifest_url:
         return _load_manifest_from_url(manifest_url)
@@ -78,7 +74,6 @@ def load_image_manifest() -> list[dict[str, Any]]:
 
 @lru_cache(maxsize=1)
 def load_image_manifest_index() -> dict[str, list[dict[str, Any]]]:
-    """Return manifest rows indexed by lower-cased fileName."""
     index: dict[str, list[dict[str, Any]]] = {}
 
     for row in load_image_manifest():
@@ -86,8 +81,7 @@ def load_image_manifest_index() -> dict[str, list[dict[str, Any]]]:
         if not file_name:
             continue
 
-        key = str(file_name).lower()
-        index.setdefault(key, []).append(row)
+        index.setdefault(str(file_name).lower(), []).append(row)
 
     return index
 
