@@ -92,6 +92,7 @@ class RagGraphState(TypedDict, total=False):
     final_answer: str
     final_confidence: float
     final_used_citation_paths: list[str]
+    enable_image_references: bool
     candidate_image_references: list[dict[str, Any]]
     image_references: list[dict[str, Any]]
     image_reference_errors: list[dict[str, Any]]
