@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from backend.context.image_reference_extractor import (
     extract_image_references_from_documents,
@@ -68,6 +69,11 @@ def retrieve_relevant_images_for_final_answer(
             for image in reranked_images
             if image.get("displayEligible")
         ][:max_images]
+
+        for image in display_images:
+            blob_name = image.get("blobName")
+            if blob_name:
+                image["renderUrl"] = f"/images/render?blobName={quote(str(blob_name), safe='')}"
 
         debug["displayEligibleImageCount"] = sum(
             1 for image in reranked_images if image.get("displayEligible")

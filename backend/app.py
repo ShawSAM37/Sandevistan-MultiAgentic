@@ -1222,3 +1222,45 @@ async def clear_chat_memory(request: ClearChatMemoryRequest):
         "threadId": request.threadId,
         "cleared": True,
     }
+
+
+@app.get("/images/render")
+async def render_manual_image(blobName: str):
+    """Render a private manual image blob through the backend.
+
+    MVP rules:
+    - only .png images
+    - only blobs under latest-manuals_png_only/
+    - container remains private
+    """
+    from fastapi import HTTPException
+    from fastapi.responses import StreamingResponse
+
+    from backend.services.image_blob_proxy import (
+        ImageBlobNotFoundError,
+        ImageBlobValidationError,
+        iter_response_content,
+        open_png_blob_stream,
+    )
+
+    try:
+        blob_response = open_png_blob_stream(blobName)
+    except ImageBlobValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ImageBlobNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to load image blob: {exc}",
+        ) from exc
+
+    return StreamingResponse(
+        iter_response_content(blob_response),
+        media_type="image/png",
+        headers={
+            "Cache-Control": "private, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
