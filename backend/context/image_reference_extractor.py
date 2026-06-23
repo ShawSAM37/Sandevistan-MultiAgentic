@@ -5,19 +5,19 @@ import re
 from typing import Any
 
 
-GUID_IMAGE_REFERENCE_PATTERN = re.compile(
+PNG_IMAGE_REFERENCE_PATTERN = re.compile(
     r"""
     (?P<rawReference>
         (?:
             (?:\.{1,2}[\\/])?
             (?:
-                [A-Za-z0-9_\- .]+[\\/]
+                [A-Za-z0-9_\- .%]+[\\/]
             )*
         )?
         (?P<fileName>
             GUID-[A-Za-z0-9]+
             (?:-[A-Za-z0-9]+)*
-            \.(?:png|jpg|jpeg|svg|gif)
+            -low\.png
         )
     )
     """,
@@ -25,60 +25,85 @@ GUID_IMAGE_REFERENCE_PATTERN = re.compile(
 )
 
 
-def normalize_raw_image_reference(value: str) -> str:
-    """Normalize an image reference found in text."""
+def normalize_raw_image_reference(value: str | None) -> str:
     if value is None:
         return ""
 
     cleaned = str(value).strip()
     cleaned = cleaned.strip("\"'`()[]{}<>")
     cleaned = cleaned.rstrip(".,;:")
-
     return cleaned.replace("\\", "/")
 
 
-def normalize_image_file_name(value: str) -> str:
-    """Return a normalized image file name from a raw image reference."""
+def normalize_image_file_name(value: str | None) -> str:
     raw = normalize_raw_image_reference(value)
     return os.path.basename(raw.replace("\\", "/"))
 
 
-def extract_guid_image_references_from_text(text: str | None) -> list[dict[str, str]]:
-    """Extract GUID-style image references from a text block.
+def _compact_text(value: str) -> str:
+    return " ".join(str(value or "").split())
 
-    Returns simple dictionaries:
-    {
-        "imageId": "...",
-        "fileName": "...",
-        "rawReference": "..."
-    }
-    """
+
+def _nearby_text(text: str, start: int, end: int, window_chars: int = 700) -> str:
+    left = max(0, start - window_chars)
+    right = min(len(text), end + window_chars)
+    return _compact_text(text[left:right])
+
+
+def _before_text(text: str, start: int, window_chars: int = 450) -> str:
+    left = max(0, start - window_chars)
+    return _compact_text(text[left:start])
+
+
+def _after_text(text: str, end: int, window_chars: int = 700) -> str:
+    right = min(len(text), end + window_chars)
+    return _compact_text(text[end:right])
+
+
+def extract_png_image_references_from_text(
+    text: str | None,
+    *,
+    include_nearby_text: bool = True,
+    nearby_window_chars: int = 700,
+) -> list[dict[str, Any]]:
     if not text:
         return []
 
-    results: list[dict[str, str]] = []
+    source_text = str(text)
+    results: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
 
-    for match in GUID_IMAGE_REFERENCE_PATTERN.finditer(str(text)):
+    for image_index, match in enumerate(PNG_IMAGE_REFERENCE_PATTERN.finditer(source_text), start=1):
         raw_reference = normalize_raw_image_reference(match.group("rawReference"))
         file_name = normalize_image_file_name(match.group("fileName") or raw_reference)
 
-        if not file_name:
+        if not file_name.lower().endswith(".png"):
             continue
 
-        dedupe_key = (raw_reference.lower(), file_name.lower())
-        if dedupe_key in seen:
+        key = (raw_reference.lower(), file_name.lower())
+        if key in seen:
             continue
 
-        seen.add(dedupe_key)
+        seen.add(key)
 
-        results.append(
-            {
-                "imageId": file_name,
-                "fileName": file_name,
-                "rawReference": raw_reference,
-            }
-        )
+        item: dict[str, Any] = {
+            "imageId": file_name,
+            "fileName": file_name,
+            "rawReference": raw_reference,
+            "imageIndexInChunk": image_index,
+        }
+
+        if include_nearby_text:
+            item["nearbyText"] = _nearby_text(
+                source_text,
+                match.start(),
+                match.end(),
+                window_chars=nearby_window_chars,
+            )
+            item["textBeforeImage"] = _before_text(source_text, match.start())
+            item["textAfterImage"] = _after_text(source_text, match.end())
+
+        results.append(item)
 
     return results
 
@@ -94,47 +119,41 @@ def _citation_by_path(citations: list[dict[str, Any]] | None) -> dict[str, dict[
     return by_path
 
 
-def _document_field(document: dict[str, Any], field_name: str) -> Any:
-    if not document:
-        return None
-
-    return document.get(field_name)
-
-
-def _text_for_image_extraction(document: dict[str, Any]) -> str:
+def _document_text_for_extraction(document: dict[str, Any]) -> str:
     parts: list[str] = []
 
-    for field_name in ("content", "title", "citationPath"):
-        value = _document_field(document, field_name)
+    for field_name in ("content", "title", "citationPath", "filepath", "fileName"):
+        value = document.get(field_name)
         if value:
             parts.append(str(value))
 
     return "\n".join(parts)
 
 
-def _build_image_reference(
-    base_reference: dict[str, str],
+def _build_reference(
+    base_reference: dict[str, Any],
     document: dict[str, Any],
     citation: dict[str, Any] | None,
 ) -> dict[str, Any]:
     citation = citation or {}
 
-    citation_path = (
-        citation.get("citationPath")
-        or _document_field(document, "citationPath")
-    )
+    citation_path = citation.get("citationPath") or document.get("citationPath")
 
     return {
         "imageId": base_reference.get("imageId"),
         "fileName": base_reference.get("fileName"),
         "rawReference": base_reference.get("rawReference"),
+        "imageIndexInChunk": base_reference.get("imageIndexInChunk"),
+        "nearbyText": base_reference.get("nearbyText", ""),
+        "textBeforeImage": base_reference.get("textBeforeImage", ""),
+        "textAfterImage": base_reference.get("textAfterImage", ""),
         "citationId": citation.get("citationId"),
         "citationPath": citation_path,
-        "title": citation.get("title") or _document_field(document, "title"),
-        "machine": citation.get("machine") or _document_field(document, "machine"),
-        "baseMachine": citation.get("baseMachine") or _document_field(document, "baseMachine"),
-        "serialNumber": citation.get("serialNumber") or _document_field(document, "serialNumber"),
-        "manualType": citation.get("manualType") or _document_field(document, "manualType"),
+        "title": citation.get("title") or document.get("title"),
+        "machine": citation.get("machine") or document.get("machine"),
+        "baseMachine": citation.get("baseMachine") or document.get("baseMachine"),
+        "serialNumber": citation.get("serialNumber") or document.get("serialNumber"),
+        "manualType": citation.get("manualType") or document.get("manualType"),
         "usedInAnswer": False,
         "source": "context_document",
     }
@@ -144,11 +163,6 @@ def extract_image_references_from_documents(
     documents: list[dict[str, Any]] | None,
     citations: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Extract candidate image references from retrieved/context documents.
-
-    This does not decide whether the image was used in the final answer.
-    It only attaches image filenames to their source citation/document metadata.
-    """
     if not documents:
         return []
 
@@ -160,28 +174,24 @@ def extract_image_references_from_documents(
         if not isinstance(document, dict):
             continue
 
-        citation_path = _document_field(document, "citationPath")
+        citation_path = document.get("citationPath")
         citation = citations_by_path.get(str(citation_path)) if citation_path else None
 
-        for base_reference in extract_guid_image_references_from_text(
-            _text_for_image_extraction(document)
+        for base_reference in extract_png_image_references_from_text(
+            _document_text_for_extraction(document)
         ):
-            image_reference = _build_image_reference(
-                base_reference=base_reference,
-                document=document,
-                citation=citation,
-            )
+            reference = _build_reference(base_reference, document, citation)
 
             dedupe_key = (
-                str(image_reference.get("citationPath") or ""),
-                str(image_reference.get("fileName") or "").lower(),
+                str(reference.get("citationPath") or ""),
+                str(reference.get("fileName") or "").lower(),
             )
 
             if dedupe_key in seen:
                 continue
 
             seen.add(dedupe_key)
-            results.append(image_reference)
+            results.append(reference)
 
     return results
 
@@ -190,7 +200,6 @@ def filter_image_references_for_used_citations(
     candidate_image_references: list[dict[str, Any]] | None,
     used_citation_paths: list[str] | None,
 ) -> list[dict[str, Any]]:
-    """Return image references whose citationPath was used in the final answer."""
     if not candidate_image_references or not used_citation_paths:
         return []
 
@@ -221,20 +230,11 @@ def filter_image_references_for_used_citations(
 
     return results
 
+
 def extract_image_references_from_context_text(
     context: str | None,
     citations: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Extract PNG image references from the rendered graph context.
-
-    This is a fallback for cases where used_documents are metadata-only
-    but the full context string sent to the answer model still contains
-    markdown image refs such as:
-        ![](GUID-...-low.png)
-
-    It attempts to associate images with citation paths by locating each
-    citationPath inside the context text and scanning that citation block.
-    """
     if not context:
         return []
 
@@ -249,7 +249,6 @@ def extract_image_references_from_context_text(
         }
         return extract_image_references_from_documents([synthetic_doc], [])
 
-    # Find citation path positions in the context.
     positioned: list[tuple[int, dict[str, Any]]] = []
 
     for citation in citations:
@@ -287,8 +286,6 @@ def extract_image_references_from_context_text(
             citations,
         )
 
-    # If citation paths are not present in context, use a conservative fallback:
-    # only attach all context images when there is exactly one citation.
     if len(citations) == 1:
         citation = citations[0]
         synthetic_doc = {
@@ -308,17 +305,11 @@ def extract_image_references_from_context_text(
 
     return []
 
+
 def extract_image_references_from_single_context_for_citation(
     context: str | None,
     citation: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Extract PNG image references from full context and attach them to one citation.
-
-    This is a conservative fallback for cases where:
-    - used_documents are metadata-only / content-empty
-    - final answer used exactly one citation
-    - graph context may still contain markdown image refs
-    """
     if not context:
         return []
 
