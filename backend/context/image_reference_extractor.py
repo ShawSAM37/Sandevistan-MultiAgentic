@@ -70,10 +70,13 @@ def extract_png_image_references_from_text(
         return []
 
     source_text = str(text)
+    matches = list(PNG_IMAGE_REFERENCE_PATTERN.finditer(source_text))
+
     results: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
 
-    for image_index, match in enumerate(PNG_IMAGE_REFERENCE_PATTERN.finditer(source_text), start=1):
+    for zero_index, match in enumerate(matches):
+        image_index = zero_index + 1
         raw_reference = normalize_raw_image_reference(match.group("rawReference"))
         file_name = normalize_image_file_name(match.group("fileName") or raw_reference)
 
@@ -86,6 +89,18 @@ def extract_png_image_references_from_text(
 
         seen.add(key)
 
+        previous_end = matches[zero_index - 1].end() if zero_index > 0 else 0
+        next_start = matches[zero_index + 1].start() if zero_index + 1 < len(matches) else len(source_text)
+
+        # Segment before/after is bounded by neighboring images.
+        # This prevents the first warning icon from inheriting the second diagram's table/list context.
+        before_segment = source_text[max(previous_end, match.start() - nearby_window_chars):match.start()]
+        after_segment = source_text[match.end():min(next_start, match.end() + nearby_window_chars)]
+
+        segment_left = max(previous_end, match.start() - nearby_window_chars)
+        segment_right = min(next_start, match.end() + nearby_window_chars)
+        nearby_segment = source_text[segment_left:segment_right]
+
         item: dict[str, Any] = {
             "imageId": file_name,
             "fileName": file_name,
@@ -94,19 +109,13 @@ def extract_png_image_references_from_text(
         }
 
         if include_nearby_text:
-            item["nearbyText"] = _nearby_text(
-                source_text,
-                match.start(),
-                match.end(),
-                window_chars=nearby_window_chars,
-            )
-            item["textBeforeImage"] = _before_text(source_text, match.start())
-            item["textAfterImage"] = _after_text(source_text, match.end())
+            item["nearbyText"] = _compact_text(nearby_segment)
+            item["textBeforeImage"] = _compact_text(before_segment)
+            item["textAfterImage"] = _compact_text(after_segment)
 
         results.append(item)
 
     return results
-
 
 def _citation_by_path(citations: list[dict[str, Any]] | None) -> dict[str, dict[str, Any]]:
     by_path: dict[str, dict[str, Any]] = {}

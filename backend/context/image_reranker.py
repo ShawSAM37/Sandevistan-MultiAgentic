@@ -196,15 +196,53 @@ def _rerank_one(
 
     # Direct clues after an image are useful for manual diagrams.
     after_lower = after_text.lower()
-    if "refer to the figure" in after_lower or "location of the buttons" in after_lower:
-        score += 0.18
-        reasons.append("strong boost: nearby text says to refer to figure for button locations")
-
-    # If image is surrounded by hazard banner language, reduce it when another diagram is likely needed.
     nearby_lower = nearby_text.lower()
-    if "emergency stops hazard" in nearby_lower and intent["asks_location"]:
-        score -= 0.18
-        reasons.append("penalty: emergency stops hazard banner image is secondary to location answer")
+    before_lower = before_text.lower()
+
+    if "refer to the figure" in after_lower or "location of the buttons" in after_lower:
+        score += 0.10
+        reasons.append("boost: nearby text references figure/button locations")
+
+    # Strongest signal for the actual location diagram:
+    # the text after the image contains the numbered/piped location table.
+    location_table_terms = [
+        "1|", "2|", "3|", "4|", "5|", "6|", "7|", "8|",
+        "rear end", "guardrail", "egress ladder", "electrical cabinet",
+        "main access ladder", "joystick panel", "drill mast"
+    ]
+    location_table_hits = sum(1 for term in location_table_terms if term in after_lower)
+
+    if intent["asks_location"] and location_table_hits >= 3:
+        score += 0.35
+        reasons.append(f"strong boost: image is followed by location table/list ({location_table_hits} hits)")
+
+    # Warning/hazard icon should be secondary for location questions.
+    warning_banner_terms = [
+        "emergency stops hazard",
+        "malfunctioning emergency stop",
+        "death or severe injury",
+        "always test the emergency stop"
+    ]
+    warning_banner_hits = sum(
+        1
+        for term in warning_banner_terms
+        if term in nearby_lower or term in after_lower or term in before_lower
+    )
+
+    if intent["asks_location"] and warning_banner_hits:
+        score -= 0.35
+        reasons.append(f"penalty: warning/hazard banner image is secondary to location answer ({warning_banner_hits} hits)")
+
+    # Extra mild penalty for first image in a chunk when the query asks for locations,
+    # because first image is often a warning/caution icon in these manuals.
+    try:
+        image_index = int(item.get("imageIndexInChunk") or 0)
+    except Exception:
+        image_index = 0
+
+    if intent["asks_location"] and image_index == 1 and warning_banner_hits:
+        score -= 0.12
+        reasons.append("penalty: first image appears to be warning icon before location figure")
 
     score = max(0.0, min(score, 1.0))
 
