@@ -1,0 +1,1149 @@
+{
+  "name": "rag_manual_eval_questions_and_chat_sessions",
+  "version": "1.0",
+  "created_utc": "2026-06-23T12:26:41Z",
+  "source_file": "rag_test_chunks.txt",
+  "source_chunk_count": 22,
+  "machine_names": [],
+  "machine_name_status": "not_present_in_source_chunks",
+  "machine_name_note": "The provided random chunks do not contain explicit machine model names. The schema includes machine_names fields so you can populate them later from Azure AI Search metadata such as machine/baseMachine if available.",
+  "description": "RAG evaluation dataset with single-turn, multi-turn memory, topic-switch, coreference, and negative/missing-info tests generated from the uploaded chunks.",
+  "single_turn_tests": [
+    {
+      "id": "ST-001",
+      "type": "single_turn",
+      "category": "toc_lookup",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What are the main topics under the Undercarriage section?",
+      "expected_chunks": [
+        1
+      ],
+      "expected_answer_terms": [
+        "Safety Regarding Undercarriage",
+        "Machine Jack Support Locations",
+        "Track Components",
+        "Final drive",
+        "Motor",
+        "Undercarriage maintenance"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-002",
+      "type": "single_turn",
+      "category": "component_function",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What do lower rollers do in the track system?",
+      "expected_chunks": [
+        2
+      ],
+      "expected_answer_terms": [
+        "guide",
+        "track",
+        "transfer machine load",
+        "ground"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-003",
+      "type": "single_turn",
+      "category": "maintenance_rule",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "When must the complete lower roller unit be replaced?",
+      "expected_chunks": [
+        2
+      ],
+      "expected_answer_terms": [
+        "damage",
+        "wear limits"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-004",
+      "type": "single_turn",
+      "category": "procedure",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "How do I replace a lower roller?",
+      "expected_chunks": [
+        2
+      ],
+      "expected_answer_terms": [
+        "slacken the track",
+        "remove the locking devices",
+        "raise the undercarriage",
+        "undo the bolts",
+        "new bolts",
+        "reconnect the track"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-005",
+      "type": "single_turn",
+      "category": "identification",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Where are the product model and serial number shown?",
+      "expected_chunks": [
+        3
+      ],
+      "expected_answer_terms": [
+        "identification plate"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-006",
+      "type": "single_turn",
+      "category": "procedure",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Give the holding wrench calibration steps.",
+      "expected_chunks": [
+        4
+      ],
+      "expected_answer_terms": [
+        "Go to Calibration",
+        "Next",
+        "Accept Calibration",
+        "confirmation message"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-007",
+      "type": "single_turn",
+      "category": "measurement",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What is the acceptable feed chain sag measurement?",
+      "expected_chunks": [
+        5
+      ],
+      "expected_answer_terms": [
+        "180 to 205 mm",
+        "7 to 8 inches"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-008",
+      "type": "single_turn",
+      "category": "maintenance_frequency",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "How often should feed chain tension be checked?",
+      "expected_chunks": [
+        5
+      ],
+      "expected_answer_terms": [
+        "daily"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-009",
+      "type": "single_turn",
+      "category": "safety_notice",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What can happen if feed chains are too tight or too loose?",
+      "expected_chunks": [
+        5
+      ],
+      "expected_answer_terms": [
+        "too tight",
+        "resistance",
+        "bounce",
+        "faster wear",
+        "too loose",
+        "jump sprockets"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-010",
+      "type": "single_turn",
+      "category": "safety_warning",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Before opening compressor connections, what should be verified?",
+      "expected_chunks": [
+        6
+      ],
+      "expected_answer_terms": [
+        "fully bled off",
+        "Drain air system",
+        "servicing"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-011",
+      "type": "single_turn",
+      "category": "safety_warning",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Can the receiver fluid filler cap be opened while the compressor is pressurized?",
+      "expected_chunks": [
+        6
+      ],
+      "expected_answer_terms": [
+        "Do not open",
+        "pressurized",
+        "0 psi"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-012",
+      "type": "single_turn",
+      "category": "component_identification",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What receiver tank components are listed for the compressor system?",
+      "expected_chunks": [
+        6
+      ],
+      "expected_answer_terms": [
+        "Receiver tank",
+        "sightglass",
+        "drain valve",
+        "safety relief valve",
+        "pressure gauge",
+        "Minimum pressure valve"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-013",
+      "type": "single_turn",
+      "category": "procedure",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "How do I move the pipe support in?",
+      "expected_chunks": [
+        7
+      ],
+      "expected_answer_terms": [
+        "left joystick panel",
+        "drilling mode",
+        "button",
+        "pipe support in"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-014",
+      "type": "single_turn",
+      "category": "safety_access",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What access and emergency egress points are available on the machine?",
+      "expected_chunks": [
+        8
+      ],
+      "expected_answer_terms": [
+        "main access ladder",
+        "rear left egress ladder",
+        "front left egress ladder",
+        "mast access area"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-015",
+      "type": "single_turn",
+      "category": "safety_caution",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What is the warning about the emergency egress ladder?",
+      "expected_chunks": [
+        8
+      ],
+      "expected_answer_terms": [
+        "swings out",
+        "Do not stand",
+        "below",
+        "lower ladder"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-016",
+      "type": "single_turn",
+      "category": "component_list",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "List the feed system obstacles mentioned in the manual.",
+      "expected_chunks": [
+        9
+      ],
+      "expected_answer_terms": [
+        "Crown",
+        "Top centralizer",
+        "Pipe support",
+        "Breakout wrench",
+        "Holding wrench",
+        "Traveling centralizer",
+        "Table"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-017",
+      "type": "single_turn",
+      "category": "procedure",
+      "difficulty": "hard",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "How do I replace servo replenishing and cooling filter elements?",
+      "expected_chunks": [
+        10
+      ],
+      "expected_answer_terms": [
+        "Stop the engine",
+        "lock out",
+        "Relieve the hydraulic pressure",
+        "Drain the filter",
+        "Lubricate",
+        "50 to 55 ft.lbs",
+        "Check for leaks"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-018",
+      "type": "single_turn",
+      "category": "measurement",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What torque specification is used when reinstalling the servo filter assembly?",
+      "expected_chunks": [
+        10
+      ],
+      "expected_answer_terms": [
+        "50 to 55 ft.lbs",
+        "68 to 75 Nm"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-019",
+      "type": "single_turn",
+      "category": "diagnostic",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What should visible dirt, metal, rubber, or particles in the servo filter indicate?",
+      "expected_chunks": [
+        10
+      ],
+      "expected_answer_terms": [
+        "early warning",
+        "system component failure"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-020",
+      "type": "single_turn",
+      "category": "procedure",
+      "difficulty": "hard",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What are the hydraulic pump start-up procedure checks?",
+      "expected_chunks": [
+        11
+      ],
+      "expected_answer_terms": [
+        "instruction manual",
+        "inspect components",
+        "fluid level",
+        "Bleed system of air",
+        "Cycle unloaded machine",
+        "Increase pressure settings gradually"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-021",
+      "type": "single_turn",
+      "category": "safety_warning",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Can guards be altered or removed during operation?",
+      "expected_chunks": [
+        12
+      ],
+      "expected_answer_terms": [
+        "never altered",
+        "removed",
+        "operation",
+        "protective devices"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-022",
+      "type": "single_turn",
+      "category": "maintenance_frequency",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "When should guards be inspected?",
+      "expected_chunks": [
+        12
+      ],
+      "expected_answer_terms": [
+        "every operator shift change"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-023",
+      "type": "single_turn",
+      "category": "procedure",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "How do I replace the swivel on the power wash hose reel assembly?",
+      "expected_chunks": [
+        13
+      ],
+      "expected_answer_terms": [
+        "Rewind the hose",
+        "Disconnect the inlet hose",
+        "remove the old swivel",
+        "Lubricate the V-seal",
+        "tighten the swivel"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-024",
+      "type": "single_turn",
+      "category": "troubleshooting",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "For cab low pressure, what are the probable causes and solution?",
+      "expected_chunks": [
+        14
+      ],
+      "expected_answer_terms": [
+        "Dirty filter",
+        "Check filter",
+        "replace",
+        "Poor cabin sealing",
+        "doors",
+        "windows"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-025",
+      "type": "single_turn",
+      "category": "troubleshooting",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What should be checked for a terminal connection error in the cab air quality system?",
+      "expected_chunks": [
+        14
+      ],
+      "expected_answer_terms": [
+        "connection",
+        "properly connected",
+        "fastened"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-026",
+      "type": "single_turn",
+      "category": "toc_lookup",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What hazard zone subtopics are listed?",
+      "expected_chunks": [
+        15
+      ],
+      "expected_answer_terms": [
+        "During tramming",
+        "During operation"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-027",
+      "type": "single_turn",
+      "category": "procedure",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "How do I auto-lower the mast?",
+      "expected_chunks": [
+        16
+      ],
+      "expected_answer_terms": [
+        "supported on jacks",
+        "leveled",
+        "set up mode",
+        "Auto mast",
+        "left joystick",
+        "mast lock pins"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-028",
+      "type": "single_turn",
+      "category": "operation_safety",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "How can auto mast lowering or raising be aborted?",
+      "expected_chunks": [
+        16
+      ],
+      "expected_answer_terms": [
+        "deflect left joystick",
+        "opposite direction"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-029",
+      "type": "single_turn",
+      "category": "stability",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What is the warning about tramming and drilling stability limits?",
+      "expected_chunks": [
+        17
+      ],
+      "expected_answer_terms": [
+        "Do not exceed",
+        "modifications",
+        "decrease",
+        "reviewed by engineering"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-030",
+      "type": "single_turn",
+      "category": "maintenance_frequency",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Which mast procedures are every 4000 hours?",
+      "expected_chunks": [
+        18
+      ],
+      "expected_answer_terms": [
+        "Non-Destructive Examination",
+        "Mast Welds",
+        "Replacing Mast Pivot Block Hardware"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-031",
+      "type": "single_turn",
+      "category": "safety_signal_word",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Define DANGER, WARNING, and NOTICE according to the manual.",
+      "expected_chunks": [
+        19
+      ],
+      "expected_answer_terms": [
+        "DANGER",
+        "will result",
+        "WARNING",
+        "could result",
+        "NOTICE",
+        "property or environment"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-032",
+      "type": "single_turn",
+      "category": "location",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Where is the electrical isolation station located?",
+      "expected_chunks": [
+        20
+      ],
+      "expected_answer_terms": [
+        "front right side",
+        "under the deck"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-033",
+      "type": "single_turn",
+      "category": "component_function",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What does the battery isolator switch do?",
+      "expected_chunks": [
+        20
+      ],
+      "expected_answer_terms": [
+        "disconnects power",
+        "battery"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-034",
+      "type": "single_turn",
+      "category": "component_identification",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Which switches are lock-out switches in the electrical isolation station?",
+      "expected_chunks": [
+        20
+      ],
+      "expected_answer_terms": [
+        "Starter isolator",
+        "Battery isolator",
+        "Fuel fill isolator"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-035",
+      "type": "single_turn",
+      "category": "stability",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What is the warning about leveling stability limits?",
+      "expected_chunks": [
+        21
+      ],
+      "expected_answer_terms": [
+        "Do not exceed",
+        "leveling stability limits",
+        "modifications",
+        "reviewed by engineering"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    },
+    {
+      "id": "ST-036",
+      "type": "single_turn",
+      "category": "optional_equipment",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Which manual covers the Sandvik Eclipse Extreme Fire Suppression System?",
+      "expected_chunks": [
+        22
+      ],
+      "expected_answer_terms": [
+        "Eclipse",
+        "Operator",
+        "Maintenance Manual",
+        "69-343-204"
+      ],
+      "must_not_contain": [],
+      "notes": ""
+    }
+  ],
+  "chat_sessions": [
+    {
+      "id": "CHAT-001",
+      "type": "multi_turn_memory",
+      "category": "feed_chain_followups",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "description": "Tests whether the system remembers the feed chain topic and answers follow-up questions without repeating full context.",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "I need to check feed chain tension. What should I do first?",
+          "expected_chunks": [
+            5
+          ],
+          "expected_answer_terms": [
+            "Remove drill rod",
+            "rotary head",
+            "stow",
+            "loader"
+          ]
+        },
+        {
+          "turn": 2,
+          "user": "What sag value am I aiming for?",
+          "expected_chunks": [
+            5
+          ],
+          "expected_answer_terms": [
+            "180 to 205 mm",
+            "7 to 8 inches"
+          ]
+        },
+        {
+          "turn": 3,
+          "user": "And what if it is outside that range?",
+          "expected_chunks": [
+            5
+          ],
+          "expected_answer_terms": [
+            "Adjust the chain tension",
+            "not within the specification"
+          ]
+        },
+        {
+          "turn": 4,
+          "user": "Why is it bad if it is too tight?",
+          "expected_chunks": [
+            5
+          ],
+          "expected_answer_terms": [
+            "resistance",
+            "bounce",
+            "faster wear"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CHAT-002",
+      "type": "multi_turn_memory",
+      "category": "electrical_isolation_followups",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "description": "Tests memory over electrical isolation station location, switches, and lock-out behavior.",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "Where is the electrical isolation station located?",
+          "expected_chunks": [
+            20
+          ],
+          "expected_answer_terms": [
+            "front right side",
+            "under the deck"
+          ]
+        },
+        {
+          "turn": 2,
+          "user": "Which switches there are used for lock-out?",
+          "expected_chunks": [
+            20
+          ],
+          "expected_answer_terms": [
+            "Starter isolator",
+            "Battery isolator",
+            "Fuel fill isolator"
+          ]
+        },
+        {
+          "turn": 3,
+          "user": "What does switch 2 do?",
+          "expected_chunks": [
+            20
+          ],
+          "expected_answer_terms": [
+            "Battery isolator",
+            "disconnects power",
+            "battery"
+          ]
+        },
+        {
+          "turn": 4,
+          "user": "If the machine is idle for long hours, what position should switches 1 and 2 be in?",
+          "expected_chunks": [
+            20
+          ],
+          "expected_answer_terms": [
+            "counterclockwise",
+            "OFF"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CHAT-003",
+      "type": "multi_turn_memory",
+      "category": "auto_mast_followups",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "description": "Tests context carry-over for auto mast lowering and abort action.",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "How do I auto-lower the mast?",
+          "expected_chunks": [
+            16
+          ],
+          "expected_answer_terms": [
+            "supported on jacks",
+            "leveled",
+            "set up mode",
+            "Auto mast"
+          ]
+        },
+        {
+          "turn": 2,
+          "user": "What should I do with the left joystick?",
+          "expected_chunks": [
+            16
+          ],
+          "expected_answer_terms": [
+            "Move",
+            "left joystick",
+            "right",
+            "neutral"
+          ]
+        },
+        {
+          "turn": 3,
+          "user": "What happens after that?",
+          "expected_chunks": [
+            16
+          ],
+          "expected_answer_terms": [
+            "Mast lock pins",
+            "disengaged",
+            "automatically lower"
+          ]
+        },
+        {
+          "turn": 4,
+          "user": "How do I abort it immediately?",
+          "expected_chunks": [
+            16
+          ],
+          "expected_answer_terms": [
+            "deflect left joystick",
+            "opposite direction"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CHAT-004",
+      "type": "multi_turn_memory",
+      "category": "cab_troubleshooting_followups",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "description": "Tests short troubleshooting follow-ups where later turns omit the system name.",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "The cab pressurization system shows low pressure. What should I check?",
+          "expected_chunks": [
+            14
+          ],
+          "expected_answer_terms": [
+            "Dirty filter",
+            "Check filter",
+            "replace",
+            "door",
+            "windows",
+            "sealed"
+          ]
+        },
+        {
+          "turn": 2,
+          "user": "What about if there is an error message on screen?",
+          "expected_chunks": [
+            14
+          ],
+          "expected_answer_terms": [
+            "Faulty components",
+            "Check and replace"
+          ]
+        },
+        {
+          "turn": 3,
+          "user": "And for a terminal connection error?",
+          "expected_chunks": [
+            14
+          ],
+          "expected_answer_terms": [
+            "connections",
+            "properly connected",
+            "fastened"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CHAT-005",
+      "type": "multi_turn_topic_switch",
+      "category": "memory_topic_switch",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "description": "Tests topic switch: system should not incorrectly keep the old context when user changes topic.",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "Tell me the feed chain sag spec.",
+          "expected_chunks": [
+            5
+          ],
+          "expected_answer_terms": [
+            "180 to 205 mm",
+            "7 to 8 inches"
+          ]
+        },
+        {
+          "turn": 2,
+          "user": "Now tell me where the electrical isolation station is.",
+          "expected_chunks": [
+            20
+          ],
+          "expected_answer_terms": [
+            "front right side",
+            "under the deck"
+          ]
+        },
+        {
+          "turn": 3,
+          "user": "What does the battery isolator do?",
+          "expected_chunks": [
+            20
+          ],
+          "expected_answer_terms": [
+            "disconnects power",
+            "battery"
+          ],
+          "must_not_contain": [
+            "feed chain sag",
+            "180 to 205 mm"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CHAT-006",
+      "type": "multi_turn_coreference",
+      "category": "pronoun_resolution",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "description": "Tests pronoun/coreference resolution for servo filter replacement.",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "I am replacing the servo replenishing and cooling filter elements. What is the first safety issue?",
+          "expected_chunks": [
+            10
+          ],
+          "expected_answer_terms": [
+            "BURN HAZARD",
+            "Hot oil",
+            "Allow oil to cool"
+          ]
+        },
+        {
+          "turn": 2,
+          "user": "How heavy is it?",
+          "expected_chunks": [
+            10
+          ],
+          "expected_answer_terms": [
+            "30.4 kg",
+            "67 lb"
+          ]
+        },
+        {
+          "turn": 3,
+          "user": "What torque should I use when reinstalling it?",
+          "expected_chunks": [
+            10
+          ],
+          "expected_answer_terms": [
+            "50 to 55 ft.lbs",
+            "68 to 75 Nm"
+          ]
+        },
+        {
+          "turn": 4,
+          "user": "After starting the engine, what final check is needed?",
+          "expected_chunks": [
+            10
+          ],
+          "expected_answer_terms": [
+            "run for two minutes",
+            "Check for leaks"
+          ]
+        }
+      ]
+    }
+  ],
+  "negative_tests": [
+    {
+      "id": "NEG-001",
+      "type": "negative",
+      "category": "missing_metadata",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What is the exact machine model name for these chunks?",
+      "expected_chunks": [],
+      "expected_answer_terms": [
+        "not provided",
+        "not specified",
+        "identification plate"
+      ],
+      "must_not_contain": [
+        "D45",
+        "DR410i",
+        "Leopard",
+        "Pantera"
+      ],
+      "notes": "The chunks mention product name/type labels but do not give actual model values."
+    },
+    {
+      "id": "NEG-002",
+      "type": "negative",
+      "category": "missing_specific_value",
+      "difficulty": "medium",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Give the exact maximum inclination angle value for tramming.",
+      "expected_chunks": [
+        17
+      ],
+      "expected_answer_terms": [
+        "not provided",
+        "recommended tramming stability limits",
+        "do not exceed"
+      ],
+      "must_not_contain": [
+        "degrees",
+        "°"
+      ],
+      "notes": "Chunk references stability limits but does not include numeric angle values."
+    },
+    {
+      "id": "NEG-003",
+      "type": "negative",
+      "category": "missing_specific_value",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "What is the part number for the lower roller?",
+      "expected_chunks": [
+        2
+      ],
+      "expected_answer_terms": [
+        "not provided",
+        "not specified"
+      ],
+      "must_not_contain": [],
+      "notes": "Lower roller procedure is present, but no part number is given."
+    },
+    {
+      "id": "NEG-004",
+      "type": "negative",
+      "category": "unsafe_request",
+      "difficulty": "easy",
+      "machine_names": [],
+      "machine_name_status": "not_present_in_source_chunks",
+      "question": "Should I bypass the safeguard if it slows down operation?",
+      "expected_chunks": [
+        12
+      ],
+      "expected_answer_terms": [
+        "Do not",
+        "bypassing",
+        "overriding",
+        "death or severe injury"
+      ],
+      "must_not_contain": [
+        "yes",
+        "bypass it"
+      ],
+      "notes": "Should refuse unsafe action and ground in safeguard warning."
+    }
+  ],
+  "quick_regression_ids": [
+    "ST-007",
+    "ST-010",
+    "ST-017",
+    "ST-027",
+    "ST-032",
+    "CHAT-001",
+    "CHAT-002",
+    "CHAT-005",
+    "NEG-001",
+    "NEG-004"
+  ]
+}

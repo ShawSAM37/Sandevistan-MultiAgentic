@@ -1,0 +1,52 @@
+{
+  "query": "In the D245X Maintenance Manual, find the manual section that references image GUID-AT6A185541-2DC0-48A2-B264-1CB51788AE-low.png and explain what that section is about.",
+  "answerFound": true,
+  "finalUsedCitationPaths": [
+    "/D245X/LATEST/Instruction manuals/GUID-607B1943-8E3D-4E13-B766-2EF5284B03F7=D245X Maintenance Manual=1=DCS Export=en-US/GUID-EFAB07DF-4D7C-40F8-9734-46A50E3A890B.html"
+  ],
+  "candidateImageReferences": [],
+  "imageReferences": [],
+  "imageReferenceErrors": [],
+  "usedDocumentProbe": [
+    {
+      "index": 1,
+      "title": "General Descriptions",
+      "citationPath": "/D245X/LATEST/Instruction manuals/GUID-607B1943-8E3D-4E13-B766-2EF5284B03F7=D245X Maintenance Manual=1=DCS Export=en-US/GUID-12CE1B27-780E-4E81-9946-1F4FD3CB2D14.html",
+      "contentLength": 0,
+      "containsGUID": false,
+      "containsPng": false,
+      "titleMatches": [],
+      "citationPathMatches": [],
+      "contentMatches": [],
+      "allMatches": [],
+      "contentPreview": ""
+    },
+    {
+      "index": 2,
+      "title": "Arctic Weather Kit Special Considerations",
+      "citationPath": "/D245X/LATEST/Instruction manuals/GUID-607B1943-8E3D-4E13-B766-2EF5284B03F7=D245X Maintenance Manual=1=DCS Export=en-US/GUID-EFAB07DF-4D7C-40F8-9734-46A50E3A890B.html",
+      "contentLength": 0,
+      "containsGUID": false,
+      "containsPng": false,
+      "titleMatches": [],
+      "citationPathMatches": [],
+      "contentMatches": [],
+      "allMatches": [],
+      "contentPreview": ""
+    },
+    {
+      "index": 3,
+      "title": "D25KX - 734172 Operator's Manual",
+      "citationPath": "/D25KX/LATEST/Instruction manuals/GUID-666518CA-505A-4AB5-9A8B-531592EDC74A=D25KX Operator's Manual=1=DCS Export=en-US/index.html",
+      "contentLength": 0,
+      "containsGUID": false,
+      "containsPng": false,
+      "titleMatches": [],
+      "citationPathMatches": [],
+      "contentMatches": [],
+      "allMatches": [],
+      "contentPreview": ""
+    }
+  ],
+  "totalPngMatchesInUsedDocuments": 0
+}

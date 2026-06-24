@@ -1,0 +1,121 @@
+{
+  "query": "How do I replace the hydraulic tank breather filter on a DR410i?",
+  "answerFound": true,
+  "queryUnderstanding": {
+    "intent": "unknown",
+    "confidence": 0.0,
+    "rewrittenQuery": "How do I replace the hydraulic tank breather filter on a DR410i?",
+    "keywords": [
+      "hydraulic tank breather filter",
+      "DR410i"
+    ],
+    "detectedEntities": {
+      "machine": null,
+      "baseMachine": "DR410i",
+      "serialNumber": null,
+      "manualType": null,
+      "component": "hydraulic tank breather filter",
+      "procedureType": null
+    },
+    "filters": {
+      "baseMachine": "DR410i"
+    },
+    "filterConfidence": {
+      "baseMachine": 0.95
+    },
+    "needsClarification": false,
+    "clarificationQuestion": null,
+    "reason": "Query understanding failed; using original question without filters."
+  },
+  "finalUsedCitationPaths": [
+    "/DR410i/734117/Instruction manuals/GUID-60876B59-D86E-48AD-975A-BE3A1A8D6110=DR410i Service Manual=9=DCS Export=en-US/GUID-F6CB30A3-FFE5-4505-B5E8-44C14786B9A6.html",
+    "/DR410i/LATEST/Instruction manuals/GUID-60876B59-D86E-48AD-975A-BE3A1A8D6110=DR410i Service Manual=9=DCS Export=en-US/GUID-F6CB30A3-FFE5-4505-B5E8-44C14786B9A6.html"
+  ],
+  "candidateImageReferences": [],
+  "imageReferences": [],
+  "imageReferenceErrors": [],
+  "usedDocumentProbe": [
+    {
+      "index": 1,
+      "keys": [
+        "baseMachine",
+        "citationId",
+        "citationPath",
+        "contentLength",
+        "id",
+        "machine",
+        "manualType",
+        "rerankerScore",
+        "score",
+        "serialNumber",
+        "title",
+        "truncated"
+      ],
+      "title": "Hydraulic Tank Breather Filter",
+      "citationPath": "/DR410i/734117/Instruction manuals/GUID-60876B59-D86E-48AD-975A-BE3A1A8D6110=DR410i Service Manual=9=DCS Export=en-US/GUID-F6CB30A3-FFE5-4505-B5E8-44C14786B9A6.html",
+      "contentLength": 0,
+      "containsGUID": false,
+      "containsPng": false,
+      "titleMatches": [],
+      "citationPathMatches": [],
+      "contentMatches": [],
+      "allMatches": [],
+      "contentPreview": ""
+    },
+    {
+      "index": 2,
+      "keys": [
+        "baseMachine",
+        "citationId",
+        "citationPath",
+        "contentLength",
+        "id",
+        "machine",
+        "manualType",
+        "rerankerScore",
+        "score",
+        "serialNumber",
+        "title",
+        "truncated"
+      ],
+      "title": "Hydraulic Tank Breather Filter",
+      "citationPath": "/DR410i/LATEST/Instruction manuals/GUID-60876B59-D86E-48AD-975A-BE3A1A8D6110=DR410i Service Manual=9=DCS Export=en-US/GUID-F6CB30A3-FFE5-4505-B5E8-44C14786B9A6.html",
+      "contentLength": 0,
+      "containsGUID": false,
+      "containsPng": false,
+      "titleMatches": [],
+      "citationPathMatches": [],
+      "contentMatches": [],
+      "allMatches": [],
+      "contentPreview": ""
+    },
+    {
+      "index": 3,
+      "keys": [
+        "baseMachine",
+        "citationId",
+        "citationPath",
+        "contentLength",
+        "id",
+        "machine",
+        "manualType",
+        "rerankerScore",
+        "score",
+        "serialNumber",
+        "title",
+        "truncated"
+      ],
+      "title": "Hydraulic Tank Breather Filter",
+      "citationPath": "/DR410i/LATEST/Instruction manuals/GUID-C6E8618D-AE98-4B43-A99A-E8B3F13A7614=DR410i Service Manual_1.11.0 &amp; twostage spurgear Rotary Head=2=DCS Export=en-US/GUID-F6CB30A3-FFE5-4505-B5E8-44C14786B9A6.html",
+      "contentLength": 0,
+      "containsGUID": false,
+      "containsPng": false,
+      "titleMatches": [],
+      "citationPathMatches": [],
+      "contentMatches": [],
+      "allMatches": [],
+      "contentPreview": ""
+    }
+  ],
+  "totalPngMatchesInUsedDocuments": 0
+}
