@@ -1,0 +1,50 @@
+﻿# Git
+.git/
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.azure-local-notes.txt
+*.key
+*.pem
+*.pfx
+secrets.toml
+.streamlit/secrets.toml
+
+# Logs
+logs/
+*.log
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build/test outputs
+dist/
+build/
+*.egg-info/
+coverage.xml
+htmlcov/
+
+# Eval outputs
+eval_results/
+backend/evals/results/
